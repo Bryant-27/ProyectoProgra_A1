@@ -2,6 +2,7 @@
 using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.Mvc;
 namespace Proyecto_A1;
 
 public static class UsuariosEndpoints
@@ -10,14 +11,23 @@ public static class UsuariosEndpoints
     {
         var group = routes.MapGroup("/api/Usuarios").WithTags(nameof(Usuarios));
 
-        group.MapGet("/", async (PagosMovilesContext db) =>
+        // [FromServices] se agrega para inyectar el contexto de la base de datos
+        // [FromServices] se utiliza para indicar que el PagosMovilesContext
+        // no proviene de la solicitud HTTP (body, ruta o query),
+        // sino que debe ser inyectado desde el contenedor de dependencias (DI).
+        // Esto evita que ASP.NET Core intente inferirlo como un parámetro del body,
+        // lo cual provocaría un error en tiempo de ejecución, especialmente en
+        // endpoints GET donde no existe cuerpo en la petición.
+
+
+        group.MapGet("/", async ([FromServices] PagosMovilesContext db) =>
         {
             return await db.Usuarios.ToListAsync();
         })
         .WithName("GetAllUsuarios")
         .WithOpenApi();
 
-        group.MapGet("/{id}", async Task<Results<Ok<Usuarios>, NotFound>> (int idusuario, PagosMovilesContext db) =>
+        group.MapGet("/{id}", async Task<Results<Ok<Usuarios>, NotFound>> (int idusuario, [FromServices] PagosMovilesContext db) =>
         {
             return await db.Usuarios.AsNoTracking()
                 .FirstOrDefaultAsync(model => model.IdUsuario == idusuario)
@@ -28,7 +38,7 @@ public static class UsuariosEndpoints
         .WithName("GetUsuariosById")
         .WithOpenApi();
 
-        group.MapPut("/{id}", async Task<Results<Ok, NotFound>> (int idusuario, Usuarios usuarios, PagosMovilesContext db) =>
+        group.MapPut("/{id}", async Task<Results<Ok, NotFound>> (int idusuario, Usuarios usuarios, [FromServices] PagosMovilesContext db) =>
         {
             var affected = await db.Usuarios
                 .Where(model => model.IdUsuario == idusuario)
@@ -50,7 +60,7 @@ public static class UsuariosEndpoints
         .WithName("UpdateUsuarios")
         .WithOpenApi();
 
-        group.MapPost("/", async (Usuarios usuarios, PagosMovilesContext db) =>
+        group.MapPost("/", async (Usuarios usuarios, [FromServices] PagosMovilesContext db) =>
         {
             db.Usuarios.Add(usuarios);
             await db.SaveChangesAsync();
@@ -59,7 +69,7 @@ public static class UsuariosEndpoints
         .WithName("CreateUsuarios")
         .WithOpenApi();
 
-        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (int idusuario, PagosMovilesContext db) =>
+        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (int idusuario, [FromServices] PagosMovilesContext db) =>
         {
             var affected = await db.Usuarios
                 .Where(model => model.IdUsuario == idusuario)
