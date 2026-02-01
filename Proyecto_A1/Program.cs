@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Negotiate;
+using Proyecto_A1;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +44,8 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast")
 .WithOpenApi();
+
+app.MapUsuariosEndpoints();
 
 app.Run();
 
