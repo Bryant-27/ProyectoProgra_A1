@@ -40,13 +40,7 @@ public partial class PagosMovilesContext : DbContext
     public virtual DbSet<Usuarios> Usuarios { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (!optionsBuilder.IsConfigured)
-        {
-            // Fallback solo si no se configuró vía DI
-            optionsBuilder.UseSqlServer("Server=LEYLA\\SQLSERVER2;Database=Pagos_moviles;User id=sa;password=1234;Encrypt=False;");
-        }
-    }
+        => optionsBuilder.UseSqlServer("Name=DefaultConnection");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -277,9 +271,7 @@ public partial class PagosMovilesContext : DbContext
         {
             entity.HasKey(e => e.IdUsuario).HasName("PK__Usuarios__DE4431C51525D0DC");
 
-            entity.Property(e => e.IdUsuario)
-                .ValueGeneratedNever()
-                .HasColumnName("ID_Usuario");
+            entity.Property(e => e.IdUsuario).HasColumnName("ID_Usuario");
             entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.FechaCreacion)
                 .HasDefaultValueSql("(getdate())")
