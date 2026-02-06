@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.Negotiate;
+﻿using Microsoft.AspNetCore.Authentication.Negotiate;
 using Proyecto_A1;
 using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +53,8 @@ app.MapGet("/weatherforecast", () =>
 .WithOpenApi();
 
 app.MapUsuariosEndpoints();
+
+app.MapTablaPantallasEndpoints();
 
 app.Run();
 

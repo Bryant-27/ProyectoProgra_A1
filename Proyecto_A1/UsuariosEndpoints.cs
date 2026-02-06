@@ -75,7 +75,17 @@ public static class UsuariosEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    error = "Debe especificar al menos un criterio de búsqueda"
+                    succes= false,
+                    status = 400,
+                    error = new
+                    {
+                        code = "VALIDATION_ERROR",
+                        message = "Datos inválidos",
+                        details = new[]
+                        {
+                            "Debe especificar al menos un criterio de búsqueda"
+                        }
+                    }
                 });
             }
 
@@ -159,8 +169,19 @@ public static class UsuariosEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    error = "El formato del email no es válido."
+                    success = false,
+                    status = 400,
+                    error = new
+                    {
+                        code = "VALIDATION_ERROR",
+                        message = "Datos inválidos",
+                        details = new[]
+                        {
+                            "El formato del email no es válido"
+                        }
+                    }
                 });
+
             }
 
             // Hashear de la contraseña 
