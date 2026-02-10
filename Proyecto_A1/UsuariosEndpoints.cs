@@ -69,23 +69,18 @@ public static class UsuariosEndpoints
             }
             if (!string.IsNullOrEmpty(tipo))
             {
-                query = query.Where(u => u.TipoIdentificacion.Contains(tipo));
+                // Convertimos el 'tipo' que viene por parámetro (string) a int cambio realizado
+                //modelos usuario 
+                if (int.TryParse(tipo, out int tipoId))
+                {
+                    query = query.Where(u => u.TipoIdentificacion == tipoId);
+                }
             }
             if (string.IsNullOrWhiteSpace(identificacion) && string.IsNullOrWhiteSpace(nombre) && string.IsNullOrWhiteSpace(tipo))
             {
                 return Results.BadRequest(new
                 {
-                    succes= false,
-                    status = 400,
-                    error = new
-                    {
-                        code = "VALIDATION_ERROR",
-                        message = "Datos inválidos",
-                        details = new[]
-                        {
-                            "Debe especificar al menos un criterio de búsqueda"
-                        }
-                    }
+                    error = "Debe especificar al menos un criterio de búsqueda"
                 });
             }
 
@@ -169,19 +164,8 @@ public static class UsuariosEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    success = false,
-                    status = 400,
-                    error = new
-                    {
-                        code = "VALIDATION_ERROR",
-                        message = "Datos inválidos",
-                        details = new[]
-                        {
-                            "El formato del email no es válido"
-                        }
-                    }
+                    error = "El formato del email no es válido."
                 });
-
             }
 
             // Hashear de la contraseña 

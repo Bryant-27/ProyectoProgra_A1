@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;//llaves primarias
 
 namespace DataAccess.Models;
 
 public partial class TransaccionEnvio
 {
+    [Key]
     public int IdTransaccion { get; set; }
 
     public int IdEntidadOrigen { get; set; }

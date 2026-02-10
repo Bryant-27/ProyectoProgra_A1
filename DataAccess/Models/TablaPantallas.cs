@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace DataAccess.Models;
 
 public partial class TablaPantallas
 {
+    [Key]
     public int IdPantalla { get; set; }
 
     public string Nombre { get; set; } = null!;
@@ -19,3 +21,4 @@ public partial class TablaPantallas
 
     public virtual ICollection<RolPorPantalla> RolPorPantalla { get; set; } = new List<RolPorPantalla>();
 }
+
