@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using DataAccess.Models;
+using Entities.DTOs;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logica_Negocio.Services
@@ -18,7 +19,7 @@ namespace Logica_Negocio.Services
         }
 
         // Método auxiliar para validar transacciones
-        public bool ValidarTransaccion(TransaccionRequest request)
+        public bool ValidarTransaccion( TransaccionRequest request)
         {
             if (request == null)
                 return false;
@@ -136,6 +137,8 @@ namespace Logica_Negocio.Services
                             Modulo = "SRV7",
                             Fecha = DateTime.Now
                         };
+
+                     
 
                         await _context.Bitacora.AddAsync(bitacora);
                         await _context.SaveChangesAsync();
