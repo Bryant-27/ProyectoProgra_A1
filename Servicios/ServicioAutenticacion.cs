@@ -21,7 +21,7 @@ namespace Servicios
         {
             _context = context;
             _bitacoraContext = bitacoraContext;
-            _secretKey = config["Settings:SecretKey"] ?? "ClaveSuperSecretaDeMasDe32Caracteres123456";
+            _secretKey = config["Settings:SecretKey"] ?? throw new Exception("SecretKey no configurada en appsettings."); ;
         }
 
         public async Task<InicioSesion?> ValidarYAutenticar(int idUsuario, string nombre, string password)

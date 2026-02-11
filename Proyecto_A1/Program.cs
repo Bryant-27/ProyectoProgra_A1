@@ -20,17 +20,25 @@ builder.Services.AddDbContext<DbContext_Tokens>(options =>
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {
-    var key = Encoding.ASCII.GetBytes(
-        builder.Configuration["Settings:SecretKey"] ?? "ClaveSuperSecretaDeMasDe32Caracteres123456"
-        );
+    //var key = Encoding.ASCII.GetBytes(
+    //    builder.Configuration["Settings:SecretKey"]);
+
+    var key = builder.Configuration["Settings:SecretKey"];
+
+    if (string.IsNullOrEmpty(key))
+    {
+        throw new Exception("La clave secreta para JWT no puede estar vacía. Verifique la configuración.");
+    }
+        
+    var secretkey = Encoding.ASCII.GetBytes(key);
 
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = false,
         ValidateAudience = false,
-        ValidateLifetime = true,
+        ValidateLifetime = false,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
+        IssuerSigningKey = new SymmetricSecurityKey(secretkey),
 
     };
 });

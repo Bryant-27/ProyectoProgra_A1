@@ -53,6 +53,9 @@ public static class UsuariosEndpoints
         {
             var query = db.Usuarios.AsNoTracking().AsQueryable();
 
+            var usuarios = await db.Usuarios.Include(u => u.TipoIdentificacionNavigation).ToListAsync();
+
+
             if (!string.IsNullOrEmpty(identificacion))
             {
                 query = query.Where(u => u.Identificacion.Contains(identificacion));
@@ -67,7 +70,7 @@ public static class UsuariosEndpoints
                 //modelos usuario 
                 if (int.TryParse(tipo, out int tipoId))
                 {
-                    query = query.Where(u => u.TipoIdentificacion == tipoId);
+                    query = query.Where(u => u.TipoIdentificacionNavigation.IdIdentificacion == tipoId);
                 }
             }
             if (string.IsNullOrWhiteSpace(identificacion) && string.IsNullOrWhiteSpace(nombre) && string.IsNullOrWhiteSpace(tipo))
@@ -93,7 +96,7 @@ public static class UsuariosEndpoints
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(m => m.IdUsuario, usuarios.IdUsuario)
                     .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto)
-                    .SetProperty(m => m.TipoIdentificacion, usuarios.TipoIdentificacion)
+                    .SetProperty(m => m.TipoIdentificacionNavigation.TipoIdentificacion, usuarios.TipoIdentificacionNavigation.TipoIdentificacion)
                     .SetProperty(m => m.Identificacion, usuarios.Identificacion)
                     .SetProperty(m => m.Email, usuarios.Email)
                     .SetProperty(m => m.Telefono, usuarios.Telefono)
