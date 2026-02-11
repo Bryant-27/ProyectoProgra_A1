@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace DataAccess.Models;
 
 public partial class RolPorPantalla
 {
+    [Key]
     public int IdRolPorPantalla { get; set; }
 
     public int IdPantalla { get; set; }
@@ -17,3 +19,4 @@ public partial class RolPorPantalla
 
     public virtual Roles IdRolNavigation { get; set; } = null!;
 }
+

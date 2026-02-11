@@ -69,7 +69,12 @@ public static class UsuariosEndpoints
             }
             if (!string.IsNullOrEmpty(tipo))
             {
-                query = query.Where(u => u.TipoIdentificacion.Contains(tipo));
+                // Convertimos el 'tipo' que viene por parámetro (string) a int cambio realizado
+                //modelos usuario 
+                if (int.TryParse(tipo, out int tipoId))
+                {
+                    query = query.Where(u => u.TipoIdentificacion == tipoId);
+                }
             }
             if (string.IsNullOrWhiteSpace(identificacion) && string.IsNullOrWhiteSpace(nombre) && string.IsNullOrWhiteSpace(tipo))
             {
