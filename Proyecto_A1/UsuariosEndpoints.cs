@@ -48,13 +48,7 @@ public static class UsuariosEndpoints
 
         /*------- METODOS GET TRAER A LOS USUARIOS POR IDENTIFICACION, NOMBRE Y TIPO -------*/
 
-        // El error CS1593 ocurre porque el delegado generado por MapGet espera que los parámetros coincidan exactamente con los nombres de los parámetros de la ruta o query string.
-        // En tu caso, los parámetros del método anónimo son: (string? identificacion, string? nombre, string? tipo, [FromServices] PagosMovilesContext db)
-        // Pero al usar MapGet("/filtro", ...), los parámetros identificacion, nombre y tipo deben ser obtenidos de la query string, y el contexto db debe ser inyectado.
-        // El problema es que MapGet no puede inferir correctamente la inyección de servicios cuando hay más de 3 parámetros y uno de ellos es [FromServices].
-        // Solución: Usa un objeto explícito para los parámetros de búsqueda o usa [AsParameters] para que los parámetros de la query string se agrupen en un solo objeto.
-        // Alternativamente, puedes usar un lambda con un solo parámetro HttpContext y extraer los valores manualmente, pero la forma recomendada es la siguiente:
-
+        
         group.MapGet("/filtro", async ([FromQuery] string? identificacion, [FromQuery] string? nombre, [FromQuery] string? tipo, [FromServices] PagosMovilesContext db) =>
         {
             var query = db.Usuarios.AsNoTracking().AsQueryable();
