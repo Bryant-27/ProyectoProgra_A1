@@ -14,11 +14,13 @@ namespace Servicios
     public class ServicioAutenticacion
     {
         private readonly DbContext_Tokens _context;
+        private readonly DBContext_Bitacora _bitacoraContext;
         private readonly string _secretKey;
 
-        public ServicioAutenticacion(DbContext_Tokens context, IConfiguration config)
+        public ServicioAutenticacion(DbContext_Tokens context,DBContext_Bitacora bitacoraContext, IConfiguration config)
         {
             _context = context;
+            _bitacoraContext = bitacoraContext;
             _secretKey = config["Settings:SecretKey"] ?? "ClaveSuperSecretaDeMasDe32Caracteres123456";
         }
 
@@ -51,6 +53,10 @@ namespace Servicios
             {
                 Console.WriteLine("Error generando token: " + ex.Message);
                 estadoRegistro = 5;
+                await RegistrarAccionBitacora(
+                usuario.Usuario,
+                "GENERACION_TOKEN",
+                "ERROR");
             }
 
             var sesion = new InicioSesion
@@ -65,8 +71,36 @@ namespace Servicios
             _context.InicioSesiones.Add(sesion);
             await _context.SaveChangesAsync();
 
+            await RegistrarAccionBitacora(
+                usuario.Usuario,
+                "Login",
+                "Exito"
+                );
+
+
             return (estadoRegistro == 5) ? null : sesion;
         }
+
+        //METODO BITACORA CON TODO REUTILIZAR
+        public async Task RegistrarAccionBitacora(
+            string usuario,
+            string accion,
+            string resultado)
+        {
+            var bitacora = new BitacoraMovimiento
+            {
+                Usuario = usuario,
+                Accion = accion,
+                Descripcion = "Se realiza solicitud de ingreso con un usuario con verificacion",
+                FechaRegistro = DateTime.UtcNow,
+                Servicio = "Servicio de autenticacion generacion de tokens ",
+                Resultado = resultado
+            };
+
+            _bitacoraContext.Bitacora.Add(bitacora);
+            await _bitacoraContext.SaveChangesAsync();
+        }
+
 
         public string GenerarToken(Usuarios usuario, DateTime expiracion)
         {
