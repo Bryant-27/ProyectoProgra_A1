@@ -11,7 +11,8 @@ public static class UsuariosEndpoints
 {
     public static void MapUsuariosEndpoints(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/endpoint/user").WithTags(nameof(Usuarios));
+
+        var group = routes.MapGroup("/endpoint/user").RequireAuthorization();
 
         // [FromServices] se agrega para inyectar el contexto de la base de datos
         // [FromServices] se utiliza para indicar que el PagosMovilesContext
@@ -90,6 +91,7 @@ public static class UsuariosEndpoints
             var affected = await db.Usuarios
                 .Where(model => model.IdUsuario == idusuario)
                 .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(m => m.IdUsuario, usuarios.IdUsuario)
                     .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto)
                     .SetProperty(m => m.TipoIdentificacion, usuarios.TipoIdentificacion)
                     .SetProperty(m => m.Identificacion, usuarios.Identificacion)
