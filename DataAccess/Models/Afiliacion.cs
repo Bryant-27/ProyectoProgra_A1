@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace DataAccess.Models;
 
 public partial class Afiliacion
 {
+    [Key]
     public long AfiliacionId { get; set; }
 
     public string NumeroCuenta { get; set; } = null!;
