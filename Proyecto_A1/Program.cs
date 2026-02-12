@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Logica_Negocio.Services.Interfaces;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -100,6 +101,8 @@ builder.Services.AddSwaggerGen(options =>
 //    .AddNegotiate();
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddScoped<IBitacoraService, BitacoraService>();
 
 var app = builder.Build();
 

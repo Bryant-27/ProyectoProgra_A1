@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
+using Logica_Negocio.Services.Interfaces;
 
 namespace Proyecto_A1;
 
@@ -27,9 +28,26 @@ public static class UsuariosEndpoints
 
         /*------- METODOS GET TRAER TODOS LOS USUARIOS -------*/
 
-        group.MapGet("/", async ([FromServices] PagosMovilesContext db) =>
+        group.MapGet("/", async (
+            IBitacoraService bitacora,
+            [FromServices] PagosMovilesContext db,
+            HttpContext context) =>
         {
-            return await db.Usuarios.ToListAsync();
+
+            var usuario = context.User.Identity?.Name ?? "Usuario desconocido";
+
+            var lista = await db.Usuarios.ToListAsync();
+
+            await bitacora.RegistrarAccionBitacora(
+                usuario,
+                "GET: CONSULTA_GENERAL",
+                "ÉXITO",
+                "Consulta de todos los usuarios realizada con éxito",
+                "API Usuarios"
+            );
+
+            return Results.Ok(lista);
+
         })
         .WithName("GetAllUsuarios")
         .WithOpenApi();
