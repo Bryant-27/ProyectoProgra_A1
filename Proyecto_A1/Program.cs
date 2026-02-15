@@ -117,6 +117,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapUsuariosEndpoints();
+app.MapTablaPantallasEndpoints();
 
 app.Run();
 
