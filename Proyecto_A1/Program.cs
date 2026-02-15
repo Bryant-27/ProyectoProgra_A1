@@ -119,6 +119,12 @@ app.MapControllers();
 app.MapUsuariosEndpoints();
 app.MapTablaPantallasEndpoints();
 
+app.MapRolesEndpoints();
+
+app.MapParametrosEndpoints();
+
+app.MapEntidadesEndpoints();
+
 app.Run();
 
 
