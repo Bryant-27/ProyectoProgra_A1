@@ -1,29 +1,50 @@
-﻿using System;
+﻿using System.Text.Json.Serialization;
 using System.Collections.Generic;
 
 namespace Entities.DTOs
 {
     public class ReporteDiarioResponse
     {
-        public DateTime Fecha { get; set; }
+        [JsonPropertyName("codigo")]
+        public int Codigo { get; set; }
+
+        [JsonPropertyName("descripcion")]
+        public string Descripcion { get; set; }
+
+        [JsonPropertyName("fecha")]
+        public DateTime? Fecha { get; set; }
+
+        [JsonPropertyName("totalTransacciones")]
         public int TotalTransacciones { get; set; }
-        public decimal TotalMonto { get; set; }
-        public int TransaccionesExitosas { get; set; }
-        public int TransaccionesFallidas { get; set; }
-        public decimal MontoPromedio { get; set; }
-        public List<TransaccionDetalle> Detalles { get; set; } = new List<TransaccionDetalle>();
+
+        [JsonPropertyName("montoTotal")]
+        public decimal MontoTotal { get; set; }
+
+        [JsonPropertyName("transacciones")]
+        public List<TransaccionReporteDto> Transacciones { get; set; }  
     }
 
-    public class TransaccionDetalle
+    public class TransaccionReporteDto  
     {
-        public int TransaccionId { get; set; }
-        public string TelefonoOrigen { get; set; } = null!;
-        public string TelefonoDestino { get; set; } = null!;
+        [JsonPropertyName("id")]
+        public long Id { get; set; }
+
+        [JsonPropertyName("telefonoOrigen")]
+        public string TelefonoOrigen { get; set; }
+
+        [JsonPropertyName("nombreOrigen")]
+        public string NombreOrigen { get; set; }
+
+        [JsonPropertyName("telefonoDestino")]
+        public string TelefonoDestino { get; set; }
+
+        [JsonPropertyName("monto")]
         public decimal Monto { get; set; }
-        public string? Descripcion { get; set; }
-        public string Estado { get; set; } = null!;
+
+        [JsonPropertyName("fecha")]
         public DateTime Fecha { get; set; }
-        public string EntidadOrigen { get; set; } = null!;
-        public string EntidadDestino { get; set; } = null!;
+
+        [JsonPropertyName("estado")]
+        public string Estado { get; set; }
     }
 }

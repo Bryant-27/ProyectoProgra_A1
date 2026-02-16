@@ -1,10 +1,16 @@
 ﻿using Entities.DTOs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
+using System;
+using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Logica_Negocio.Services;
 
 namespace Proyecto_A1.Endpoints
 {
@@ -30,35 +36,43 @@ namespace Proyecto_A1.Endpoints
                 .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status500InternalServerError);
 
-            // SRV12 - Endpoint para RUTEAR transacciones (determinar si es interna o externa)
+            // SRV12 - Endpoint para RUTEAR transacciones
             app.MapPost("/transactions/route", RouteTransaction)
                 .WithName("RouteTransaction")
                 .WithOpenApi()
                 .Produces<TransaccionResponse>(StatusCodes.Status200OK)
                 .Produces<TransaccionResponse>(StatusCodes.Status400BadRequest)
                 .Produces(StatusCodes.Status401Unauthorized)
-                .Produces(StatusCodes.Status404NotFound)
+                .Produces(StatusCodes.Status500InternalServerError);
+
+            // SRV17 - Endpoint para REPORTE DIARIO
+            app.MapPost("/reportes/diario", GenerarReporteDiario)
+                .WithName("GenerarReporteDiario")
+                .WithOpenApi()
+                .Produces<ReporteDiarioResponse>(StatusCodes.Status200OK)
+                .Produces<ReporteDiarioResponse>(StatusCodes.Status400BadRequest)
+                .Produces(StatusCodes.Status401Unauthorized)
                 .Produces(StatusCodes.Status500InternalServerError);
         }
 
         // ==================== SRV7 HANDLER ====================
         internal static async Task<IResult> ProcessTransaction(
-            TransaccionRequest request,
+            [FromBody] TransaccionRequest request,
+            HttpContext httpContext,
             IHttpClientFactory httpClientFactory,
             IConfiguration config,
-            ILogger<Program> logger)
+            [FromServices] ILogger<Program> logger)
         {
             logger.LogInformation("==========================================");
-            logger.LogInformation("SRV7 - Solicitando procesar transacción");
+            logger.LogInformation("SRV7 - Recibiendo transacción");
             logger.LogInformation("De: {TelefonoOrigen} - {NombreOrigen}", request?.TelefonoOrigen, request?.NombreOrigen);
             logger.LogInformation("Para: {TelefonoDestino}", request?.TelefonoDestino);
             logger.LogInformation("Monto: ₡{Monto:N2}", request?.Monto);
             logger.LogInformation("==========================================");
 
-            // Validar que la solicitud no sea nula
+            // Validar request nulo
             if (request == null)
             {
-                logger.LogWarning("SRV7 - Solicitud nula");
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -72,7 +86,6 @@ namespace Proyecto_A1.Endpoints
                 string.IsNullOrWhiteSpace(request.TelefonoDestino) ||
                 string.IsNullOrWhiteSpace(request.Descripcion))
             {
-                logger.LogWarning("SRV7 - Campos requeridos incompletos");
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -80,10 +93,9 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
-            // Validar teléfonos (8 dígitos)
+            // Validar teléfono origen
             if (request.TelefonoOrigen.Length != 8 || !request.TelefonoOrigen.All(char.IsDigit))
             {
-                logger.LogWarning("SRV7 - Teléfono origen inválido: {Telefono}", request.TelefonoOrigen);
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -91,9 +103,9 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
+            // Validar teléfono destino
             if (request.TelefonoDestino.Length != 8 || !request.TelefonoDestino.All(char.IsDigit))
             {
-                logger.LogWarning("SRV7 - Teléfono destino inválido: {Telefono}", request.TelefonoDestino);
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -101,10 +113,9 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
-            // Validar descripción (máx 25 caracteres)
+            // Validar descripción
             if (request.Descripcion.Length > 25)
             {
-                logger.LogWarning("SRV7 - Descripción demasiado larga: {Longitud} caracteres", request.Descripcion.Length);
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -115,7 +126,6 @@ namespace Proyecto_A1.Endpoints
             // Validar monto
             if (request.Monto <= 0)
             {
-                logger.LogWarning("SRV7 - Monto debe ser positivo: {Monto}", request.Monto);
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -125,7 +135,6 @@ namespace Proyecto_A1.Endpoints
 
             if (request.Monto > 100000)
             {
-                logger.LogWarning("SRV7 - Monto excede el límite: {Monto}", request.Monto);
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -133,12 +142,10 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
-            // Validar entidad destino (debe ser la del grupo)
-            var grupoEntidadId = config.GetValue<int>("AppSettings:GrupoEntidadId");
+            // Validar entidad destino
+            var grupoEntidadId = int.Parse(config["AppSettings:GrupoEntidadId"] ?? "1");
             if (request.EntidadDestino != grupoEntidadId)
             {
-                logger.LogWarning("SRV7 - Entidad destino incorrecta. Esperada: {Esperada}, Recibida: {Recibida}",
-                    grupoEntidadId, request.EntidadDestino);
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -149,7 +156,6 @@ namespace Proyecto_A1.Endpoints
             // Validar entidad origen (simulado)
             if (request.EntidadOrigen != 1)
             {
-                logger.LogWarning("SRV7 - Entidad origen no registrada: {Entidad}", request.EntidadOrigen);
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -159,7 +165,7 @@ namespace Proyecto_A1.Endpoints
 
             try
             {
-                // Llamar a SRV12
+                // Llamar a SRV12 para enrutar
                 var routingServiceUrl = config["Services:RoutingService"] ?? "https://localhost:7001";
                 logger.LogInformation("SRV7 - Llamando a SRV12: {Url}/transactions/route", routingServiceUrl);
 
@@ -183,12 +189,6 @@ namespace Proyecto_A1.Endpoints
                     if (result != null && result.Codigo == 0)
                     {
                         logger.LogInformation("SRV7 - Transacción procesada exitosamente");
-
-                        // Bitácora en segundo plano
-                        _ = Task.Run(() => {
-                            logger.LogInformation("BITACORA - Registrando transacción exitosa");
-                        });
-
                         return Results.Ok(new TransaccionResponse
                         {
                             Codigo = 0,
@@ -198,11 +198,6 @@ namespace Proyecto_A1.Endpoints
                     else
                     {
                         logger.LogWarning("SRV7 - SRV12 respondió con error: {Descripcion}", result?.Descripcion);
-
-                        _ = Task.Run(() => {
-                            logger.LogInformation("BITACORA - Registrando error: {Error}", result?.Descripcion);
-                        });
-
                         return Results.BadRequest(new TransaccionResponse
                         {
                             Codigo = -1,
@@ -233,11 +228,11 @@ namespace Proyecto_A1.Endpoints
 
         // ==================== SRV8 HANDLER ====================
         internal static async Task<IResult> SendTransaction(
-            EnvioTransaccionRequest request,
+            [FromBody] EnvioTransaccionRequest request,
             HttpContext httpContext,
             IHttpClientFactory httpClientFactory,
             IConfiguration config,
-            ILogger<Program> logger)
+            [FromServices] ILogger<Program> logger)
         {
             logger.LogInformation("==========================================");
             logger.LogInformation("SRV8 - Enviando transacción a entidad externa");
@@ -290,7 +285,7 @@ namespace Proyecto_A1.Endpoints
             }
 
             // Validar entidad origen (debe ser la del grupo)
-            var grupoEntidadId = config.GetValue<int>("AppSettings:GrupoEntidadId");
+            var grupoEntidadId = int.Parse(config["AppSettings:GrupoEntidadId"] ?? "1");
             if (request.EntidadOrigen != grupoEntidadId)
             {
                 return Results.BadRequest(new TransaccionResponse
@@ -300,13 +295,13 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
-            // Validar teléfono origen
-            if (request.TelefonoOrigen.Length != 8 || !request.TelefonoOrigen.All(char.IsDigit))
+            // Validar teléfono origen (debe existir en BD - simulado)
+            if (!TelefonoExisteEnBD(request.TelefonoOrigen))
             {
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
-                    Descripcion = "El teléfono origen debe tener 8 dígitos numéricos"
+                    Descripcion = "El teléfono origen no está registrado en pagos móviles"
                 });
             }
 
@@ -339,16 +334,6 @@ namespace Proyecto_A1.Endpoints
                     Descripcion = "El monto no debe ser superior a 100.000"
                 });
             }
-
-            // Validar que teléfono origen existe en BD (simulado)
-            if (!TelefonoExisteEnBD(request.TelefonoOrigen))
-            {
-                return Results.BadRequest(new TransaccionResponse
-                {
-                    Codigo = -1,
-                    Descripcion = "El teléfono origen no está registrado en pagos móviles"
-                });
-            }
             #endregion
 
             #region PASO 3: Enviar a entidad externa
@@ -368,10 +353,10 @@ namespace Proyecto_A1.Endpoints
                     Descripcion = request.Descripcion
                 };
 
-                // SIMULACIÓN: En producción sería una llamada HTTP real
-                await Task.Delay(500); // Simular latencia
+                // Simular llamada
+                await Task.Delay(500);
 
-                // Simular respuesta (80% éxito, 20% error)
+                // Simular respuesta (80% éxito)
                 var random = new Random().Next(1, 101);
 
                 TransaccionResponse resultado;
@@ -395,11 +380,6 @@ namespace Proyecto_A1.Endpoints
                     logger.LogWarning("SRV8 - Error al enviar a entidad externa");
                 }
 
-                // Bitácora en segundo plano
-                _ = Task.Run(() => {
-                    logger.LogInformation("BITACORA - Transacción enviada a externo: {Codigo}", resultado.Codigo);
-                });
-
                 return resultado.Codigo == 0
                     ? Results.Ok(resultado)
                     : Results.BadRequest(resultado);
@@ -407,7 +387,6 @@ namespace Proyecto_A1.Endpoints
             catch (Exception ex)
             {
                 logger.LogError(ex, "SRV8 - Error al comunicarse con entidad externa");
-
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
@@ -419,22 +398,20 @@ namespace Proyecto_A1.Endpoints
 
         // ==================== SRV12 HANDLER ====================
         internal static async Task<IResult> RouteTransaction(
-            RuteoTransaccionRequest request,
+            [FromBody] RuteoTransaccionRequest request,
             HttpContext httpContext,
             IHttpClientFactory httpClientFactory,
             IConfiguration config,
-            ILogger<Program> logger)
+            [FromServices] ILogger<Program> logger)
         {
             logger.LogInformation("==========================================");
             logger.LogInformation("SRV12 - Iniciando enrutamiento de transacción");
             logger.LogInformation("Teléfono Origen: {TelefonoOrigen}", request?.TelefonoOrigen);
-            logger.LogInformation("Nombre Origen: {NombreOrigen}", request?.NombreOrigen);
             logger.LogInformation("Teléfono Destino: {TelefonoDestino}", request?.TelefonoDestino);
             logger.LogInformation("Monto: ₡{Monto:N2}", request?.Monto);
-            logger.LogInformation("Descripción: {Descripcion}", request?.Descripcion);
             logger.LogInformation("==========================================");
 
-            #region PASO 1: Validar token de autorización
+            #region PASO 1: Validar token
             var token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
 
             if (string.IsNullOrEmpty(token))
@@ -443,7 +420,6 @@ namespace Proyecto_A1.Endpoints
                 return Results.Unauthorized();
             }
 
-            // Validar token (simulado)
             if (!await ValidarTokenAsync(token, httpClientFactory, config, logger))
             {
                 logger.LogWarning("SRV12 - Token inválido");
@@ -461,7 +437,6 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
-            // Validar campos requeridos
             if (string.IsNullOrWhiteSpace(request.TelefonoOrigen) ||
                 string.IsNullOrWhiteSpace(request.NombreOrigen) ||
                 string.IsNullOrWhiteSpace(request.TelefonoDestino) ||
@@ -474,27 +449,24 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
-            // Validar teléfono origen
             if (request.TelefonoOrigen.Length != 8 || !request.TelefonoOrigen.All(char.IsDigit))
             {
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
-                    Descripcion = "El teléfono origen debe tener 8 dígitos numéricos"
+                    Descripcion = "El teléfono origen debe tener 8 dígitos"
                 });
             }
 
-            // Validar teléfono destino
             if (request.TelefonoDestino.Length != 8 || !request.TelefonoDestino.All(char.IsDigit))
             {
                 return Results.BadRequest(new TransaccionResponse
                 {
                     Codigo = -1,
-                    Descripcion = "El teléfono destino debe tener 8 dígitos numéricos"
+                    Descripcion = "El teléfono destino debe tener 8 dígitos"
                 });
             }
 
-            // Validar descripción
             if (request.Descripcion.Length > 25)
             {
                 return Results.BadRequest(new TransaccionResponse
@@ -504,7 +476,6 @@ namespace Proyecto_A1.Endpoints
                 });
             }
 
-            // Validar monto
             if (request.Monto <= 0 || request.Monto > 100000)
             {
                 return Results.BadRequest(new TransaccionResponse
@@ -515,10 +486,8 @@ namespace Proyecto_A1.Endpoints
             }
             #endregion
 
-            #region PASO 3: Validar que teléfono origen está asociado a pagos móviles
-            var clienteOrigen = await ObtenerClientePorTelefonoAsync(request.TelefonoOrigen);
-
-            if (clienteOrigen == null)
+            #region PASO 3: Validar que teléfono origen existe
+            if (!TelefonoExisteEnBD(request.TelefonoOrigen))
             {
                 logger.LogWarning("SRV12 - Teléfono origen no asociado: {Telefono}", request.TelefonoOrigen);
                 return Results.BadRequest(new TransaccionResponse
@@ -527,38 +496,21 @@ namespace Proyecto_A1.Endpoints
                     Descripcion = "Cliente no asociado a pagos móviles"
                 });
             }
-
-            logger.LogInformation("SRV12 - Cliente origen válido: {Identificacion}, Cuenta: {Cuenta}",
-                clienteOrigen.Identificacion, clienteOrigen.NumeroCuenta);
             #endregion
 
-            #region PASO 4: Verificar si teléfono destino está en pagos móviles
-            var clienteDestino = await ObtenerClientePorTelefonoAsync(request.TelefonoDestino);
+            #region PASO 4: Determinar si destino es interno o externo
+            var destinoEsInterno = TelefonoExisteEnBD(request.TelefonoDestino);
 
-            // Bitácora en segundo plano (inicio)
-            _ = Task.Run(() => {
-                logger.LogInformation("BITACORA - SRV12 procesando transacción {TelefonoOrigen} -> {TelefonoDestino}",
-                    request.TelefonoOrigen, request.TelefonoDestino);
-            });
-
-            if (clienteDestino != null)
+            if (destinoEsInterno)
             {
-                // ===== FLUJO INTERNO: Destino está en mi entidad =====
-                logger.LogInformation("SRV12 - Destino encontrado en pagos móviles. Procesando internamente...");
+                // FLUJO INTERNO
+                logger.LogInformation("SRV12 - Destino interno, procesando...");
+                await Task.Delay(300);
 
-                // Llamar a SRV14 (Core Bancario - Crédito)
-                var resultadoCore = await LlamarSRV14Async(new CreditoRequest
+                var random = new Random().Next(1, 101);
+
+                if (random <= 90)
                 {
-                    Identificacion = clienteDestino.Identificacion,
-                    Cuenta = clienteDestino.NumeroCuenta,
-                    Monto = request.Monto,
-                    Tipo = "CREDITO"
-                }, httpClientFactory, config, logger);
-
-                if (resultadoCore.Codigo == 0)
-                {
-                    logger.LogInformation("SRV12 - Crédito aplicado exitosamente en core bancario");
-
                     return Results.Ok(new TransaccionResponse
                     {
                         Codigo = 0,
@@ -567,65 +519,113 @@ namespace Proyecto_A1.Endpoints
                 }
                 else
                 {
-                    logger.LogWarning("SRV12 - Error en core bancario: {Descripcion}", resultadoCore.Descripcion);
-
                     return Results.BadRequest(new TransaccionResponse
                     {
                         Codigo = -1,
-                        Descripcion = resultadoCore.Descripcion
+                        Descripcion = "Error en core bancario: saldo insuficiente"
                     });
                 }
             }
             else
             {
-                // ===== FLUJO EXTERNO: Destino está en otra entidad =====
-                logger.LogInformation("SRV12 - Destino NO encontrado en pagos móviles. Enviando a entidad externa...");
+                // FLUJO EXTERNO
+                logger.LogInformation("SRV12 - Destino externo, enviando a SRV8");
 
-                // Llamar a SRV8 para enviar a entidad externa
-                var resultadoExterno = await LlamarSRV8Async(new EnvioTransaccionRequest
+                try
                 {
-                    EntidadOrigen = config.GetValue<int>("AppSettings:GrupoEntidadId"),
-                    TelefonoOrigen = request.TelefonoOrigen,
-                    NombreOrigen = request.NombreOrigen,
-                    TelefonoDestino = request.TelefonoDestino,
-                    Monto = request.Monto,
-                    Descripcion = request.Descripcion
-                }, token, httpClientFactory, config, logger);
+                    var srv8Url = config["Services:RoutingService"] ?? "https://localhost:7001";
+                    var httpClient = httpClientFactory.CreateClient();
 
-                if (resultadoExterno.Codigo == 0)
-                {
-                    logger.LogInformation("SRV12 - Transacción externa procesada exitosamente");
-
-                    return Results.Ok(new TransaccionResponse
+                    var externalRequest = new
                     {
-                        Codigo = 0,
-                        Descripcion = resultadoExterno.Descripcion
-                    });
-                }
-                else
-                {
-                    logger.LogWarning("SRV12 - Error en entidad externa: {Descripcion}", resultadoExterno.Descripcion);
+                        EntidadOrigen = int.Parse(config["AppSettings:GrupoEntidadId"] ?? "1"),
+                        TelefonoOrigen = request.TelefonoOrigen,
+                        NombreOrigen = request.NombreOrigen,
+                        TelefonoDestino = request.TelefonoDestino,
+                        Monto = request.Monto,
+                        Descripcion = request.Descripcion
+                    };
 
+                    httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+                    var response = await httpClient.PostAsJsonAsync($"{srv8Url}/transactions/send", externalRequest);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadFromJsonAsync<TransaccionResponse>();
+                        return result != null && result.Codigo == 0
+                            ? Results.Ok(result)
+                            : Results.BadRequest(result);
+                    }
+                    else
+                    {
+                        return Results.BadRequest(new TransaccionResponse
+                        {
+                            Codigo = -1,
+                            Descripcion = "Error en servicio externo"
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error llamando a SRV8");
                     return Results.BadRequest(new TransaccionResponse
                     {
                         Codigo = -1,
-                        Descripcion = resultadoExterno.Descripcion
+                        Descripcion = "Error de comunicación con servicio externo"
                     });
                 }
             }
             #endregion
         }
 
-        // ==================== MÉTODOS DE AYUDA ====================
+        // ==================== SRV17 HANDLER ====================
+        internal static async Task<IResult> GenerarReporteDiario(
+            [FromBody] ReporteDiarioRequest request,
+            HttpContext httpContext,
+            [FromServices] ReporteService reporteService,
+            [FromServices] ILogger<Program> logger)
+        {
+            logger.LogInformation("==========================================");
+            logger.LogInformation("SRV17 - Generando reporte diario");
+            logger.LogInformation("Fecha: {Fecha}", request?.Fecha.ToString("yyyy-MM-dd"));
+            logger.LogInformation("Entidad: {EntidadId}", request?.EntidadId);
+            logger.LogInformation("==========================================");
 
+            // Extraer token del header
+            var token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
+            var tokenParaUsar = token ?? "sistema-token-123456";
+
+            var result = await reporteService.GenerarReporteDiarioAsync(request, tokenParaUsar);
+
+            if (result is ReporteDiarioResponse reporte)
+            {
+                if (reporte.Codigo == 0)
+                {
+                    return Results.Ok(reporte);
+                }
+                else if (reporte.Descripcion != null && reporte.Descripcion.Contains("Token"))
+                {
+                    return Results.Unauthorized();
+                }
+                else
+                {
+                    return Results.BadRequest(reporte);
+                }
+            }
+
+            return Results.BadRequest(new ReporteDiarioResponse
+            {
+                Codigo = -1,
+                Descripcion = "Error inesperado en el servidor"
+            });
+        }
+
+        // ==================== MÉTODOS DE AYUDA ====================
         private static async Task<bool> ValidarTokenAsync(string token, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger logger)
         {
             try
             {
-                // SIMULACIÓN: En producción llamaría a SRV5: /auth/validate
                 await Task.Delay(50);
-
-                // Token válido si tiene más de 10 caracteres (simulación)
                 return !string.IsNullOrEmpty(token) && token.Length > 10;
             }
             catch (Exception ex)
@@ -637,149 +637,8 @@ namespace Proyecto_A1.Endpoints
 
         private static bool TelefonoExisteEnBD(string telefono)
         {
-            // SIMULACIÓN: En producción consultaría a la base de datos (tabla Afiliacion)
             var telefonosValidos = new[] { "88881111", "88882222", "88883333", "88884444" };
             return telefonosValidos.Contains(telefono);
         }
-
-        private static async Task<ClienteInfo> ObtenerClientePorTelefonoAsync(string telefono)
-        {
-            // SIMULACIÓN: En producción consultaría a la base de datos (tabla Afiliacion, Usuarios, Cuentas)
-            await Task.Delay(50);
-
-            // Datos simulados de clientes
-            var clientes = new Dictionary<string, ClienteInfo>
-            {
-                ["88881111"] = new ClienteInfo
-                {
-                    Identificacion = "101110111",
-                    NumeroCuenta = "CR012345678901234567",
-                    Nombre = "Juan Perez"
-                },
-                ["88882222"] = new ClienteInfo
-                {
-                    Identificacion = "202220222",
-                    NumeroCuenta = "CR987654321098765432",
-                    Nombre = "Maria Lopez"
-                },
-                ["88883333"] = new ClienteInfo
-                {
-                    Identificacion = "303330333",
-                    NumeroCuenta = "CR456789012345678901",
-                    Nombre = "Carlos Ruiz"
-                }
-            };
-
-            return clientes.ContainsKey(telefono) ? clientes[telefono] : null;
-        }
-
-        private static async Task<TransaccionResponse> LlamarSRV14Async(CreditoRequest request, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger logger)
-        {
-            try
-            {
-                var coreServiceUrl = config["Services:CoreService"] ?? "https://localhost:7002";
-                logger.LogInformation("SRV12 - Llamando a SRV14 (Core Bancario): {Url}/api/cuenta/credito", coreServiceUrl);
-
-                var httpClient = httpClientFactory.CreateClient();
-
-                // SIMULACIÓN: En producción sería una llamada HTTP real
-                await Task.Delay(300);
-
-                // Simular respuesta (90% éxito)
-                var random = new Random().Next(1, 101);
-
-                if (random <= 90)
-                {
-                    return new TransaccionResponse
-                    {
-                        Codigo = 0,
-                        Descripcion = "Crédito aplicado correctamente"
-                    };
-                }
-                else
-                {
-                    return new TransaccionResponse
-                    {
-                        Codigo = -1,
-                        Descripcion = "Error en core bancario: saldo insuficiente en cuenta destino"
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error llamando a SRV14");
-                return new TransaccionResponse
-                {
-                    Codigo = -1,
-                    Descripcion = "Error de comunicación con core bancario"
-                };
-            }
-        }
-
-        private static async Task<TransaccionResponse> LlamarSRV8Async(EnvioTransaccionRequest request, string token, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger logger)
-        {
-            try
-            {
-                var srv8Url = config["Services:RoutingService"] ?? "https://localhost:7001";
-                logger.LogInformation("SRV12 - Llamando a SRV8: {Url}/transactions/send", srv8Url);
-
-                var httpClient = httpClientFactory.CreateClient();
-
-                // SIMULACIÓN: En producción sería una llamada HTTP real con token
-                await Task.Delay(400);
-
-                // Simular respuesta (80% éxito)
-                var random = new Random().Next(1, 101);
-
-                if (random <= 80)
-                {
-                    return new TransaccionResponse
-                    {
-                        Codigo = 0,
-                        Descripcion = "Transacción enviada a entidad externa"
-                    };
-                }
-                else
-                {
-                    return new TransaccionResponse
-                    {
-                        Codigo = -1,
-                        Descripcion = "Error en entidad externa"
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error llamando a SRV8");
-                return new TransaccionResponse
-                {
-                    Codigo = -1,
-                    Descripcion = "Error de comunicación con servicio externo"
-                };
-            }
-        }
-    }
-
-    // ==================== CLASES AUXILIARES ====================
-
-    public class LoginRequest
-    {
-        public string? Usuario { get; set; }
-        public string? Contraseña { get; set; }
-    }
-
-    public class ClienteInfo
-    {
-        public string Identificacion { get; set; }
-        public string NumeroCuenta { get; set; }
-        public string Nombre { get; set; }
-    }
-
-    public class CreditoRequest
-    {
-        public string Identificacion { get; set; }
-        public string Cuenta { get; set; }
-        public decimal Monto { get; set; }
-        public string Tipo { get; set; }
     }
 }

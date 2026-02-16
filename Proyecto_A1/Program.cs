@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using Models;
 using System;
 using System.Linq;
 using System.Net.Http;
@@ -26,9 +25,9 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Pagos Móviles API - SRV7, SRV8, SRV12, SRV18",
+        Title = "Pagos Móviles API - SRV7, SRV8, SRV12, SRV17",
         Version = "v1",
-        Description = "API para recibir, enviar, rutear transacciones y gestionar bitácoras"
+        Description = "API para recibir, enviar, rutear transacciones y generar reportes"
     });
 
     // Configurar para enviar token en Swagger
@@ -67,11 +66,11 @@ builder.Services.AddDbContext<CoreBancarioContext>(options =>
 builder.Services.AddDbContext<PagosMovilesContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("PagosMovilesConnection")));
 
-// Registrar repositorios
-builder.Services.AddScoped<BitacoraRepository>();
+// Registrar repositorios - CORREGIDO: TransaccionRepository (no TrnsaccionRepository)
+builder.Services.AddScoped<TransaccionRepository>();
 
 // Registrar servicios
-builder.Services.AddScoped<BitacoraService>();
+builder.Services.AddScoped<ReporteService>();
 
 var app = builder.Build();
 
@@ -85,7 +84,7 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
-// ==================== SRV7 - RECIBIR TRANSACCIONES (PÚBLICO) ====================
+// SRV7 - RECIBIR TRANSACCIONES (PÚBLICO) 
 app.MapPost("/transactions/process", async (
     HttpContext httpContext,
     [FromBody] TransaccionRequest request,
@@ -174,7 +173,7 @@ app.MapPost("/transactions/process", async (
     }
 
     // Validar entidad destino
-    var grupoEntidadId = config.GetValue<int>("AppSettings:GrupoEntidadId");
+    var grupoEntidadId = int.Parse(config["AppSettings:GrupoEntidadId"] ?? "1");
     if (request.EntidadDestino != grupoEntidadId)
     {
         return Results.BadRequest(new TransaccionResponse
@@ -221,26 +220,6 @@ app.MapPost("/transactions/process", async (
             {
                 logger.LogInformation("SRV7 - Transacción procesada exitosamente");
 
-                // Registrar en bitácora SRV18
-                try
-                {
-                    var bitacoraService = app.Services.CreateScope().ServiceProvider.GetRequiredService<BitacoraService>();
-                    var token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
-
-                    _ = Task.Run(async () => {
-                        await bitacoraService.RegistrarAsync(new BitacoraRequest
-                        {
-                            Usuario = "SYSTEM",
-                            Accion = "SRV7_PROCESS",
-                            Descripcion = $"Transacción procesada: {request.TelefonoOrigen} -> {request.TelefonoDestino} por ₡{request.Monto}"
-                        }, token ?? "sistema-token-123456");
-                    });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Error registrando en bitácora");
-                }
-
                 return Results.Ok(new TransaccionResponse
                 {
                     Codigo = 0,
@@ -285,7 +264,7 @@ app.MapPost("/transactions/process", async (
 .AllowAnonymous();
 
 
-// ==================== SRV8 - ENVIAR TRANSACCIONES A ENTIDADES EXTERNAS ====================
+//  SRV8 - ENVIAR TRANSACCIONES A ENTIDADES EXTERNAS 
 app.MapPost("/transactions/send", async (
     [FromBody] EnvioTransaccionRequest request,
     HttpContext httpContext,
@@ -313,7 +292,7 @@ app.MapPost("/transactions/send", async (
         return Results.Unauthorized();
     }
 
-    // Validar token con SRV5 (simulado)
+    // Validar token (simulado)
     var tokenValido = await ValidarTokenAsync(token, httpClientFactory, config, logger);
     if (!tokenValido)
     {
@@ -346,7 +325,7 @@ app.MapPost("/transactions/send", async (
     }
 
     // Validar entidad origen (debe ser la del grupo)
-    var grupoEntidadId = config.GetValue<int>("AppSettings:GrupoEntidadId");
+    var grupoEntidadId = int.Parse(config["AppSettings:GrupoEntidadId"] ?? "1");
     if (request.EntidadOrigen != grupoEntidadId)
     {
         return Results.BadRequest(new TransaccionResponse
@@ -405,7 +384,6 @@ app.MapPost("/transactions/send", async (
 
         var httpClient = httpClientFactory.CreateClient();
 
-        // Preparar request para el servicio externo
         var externalRequest = new
         {
             TelefonoOrigen = request.TelefonoOrigen,
@@ -415,12 +393,15 @@ app.MapPost("/transactions/send", async (
             Descripcion = request.Descripcion
         };
 
-        // Llamada real a httpbin.org para pruebas
-        var response = await httpClient.PostAsJsonAsync($"{externalServiceUrl}/post", externalRequest);
+        // Simular llamada
+        await Task.Delay(500);
+
+        // Simular respuesta (80% éxito)
+        var random = new Random().Next(1, 101);
 
         TransaccionResponse resultado;
 
-        if (response.IsSuccessStatusCode)
+        if (random <= 80)
         {
             resultado = new TransaccionResponse
             {
@@ -434,28 +415,9 @@ app.MapPost("/transactions/send", async (
             resultado = new TransaccionResponse
             {
                 Codigo = -1,
-                Descripcion = $"Error en entidad externa: {response.StatusCode}"
+                Descripcion = "Error en entidad externa: saldo insuficiente"
             };
             logger.LogWarning("SRV8 - Error al enviar a entidad externa");
-        }
-
-        // Registrar en bitácora SRV18
-        try
-        {
-            var bitacoraService = app.Services.CreateScope().ServiceProvider.GetRequiredService<BitacoraService>();
-
-            _ = Task.Run(async () => {
-                await bitacoraService.RegistrarAsync(new BitacoraRequest
-                {
-                    Usuario = "SYSTEM",
-                    Accion = "SRV8_SEND",
-                    Descripcion = $"Transacción enviada a externo: {request.TelefonoOrigen} -> {request.TelefonoDestino} - Resultado: {resultado.Codigo}"
-                }, token);
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error registrando en bitácora");
         }
 
         return resultado.Codigo == 0
@@ -465,23 +427,6 @@ app.MapPost("/transactions/send", async (
     catch (Exception ex)
     {
         logger.LogError(ex, "SRV8 - Error al comunicarse con entidad externa");
-
-        // Registrar error en bitácora
-        try
-        {
-            var bitacoraService = app.Services.CreateScope().ServiceProvider.GetRequiredService<BitacoraService>();
-
-            _ = Task.Run(async () => {
-                await bitacoraService.RegistrarAsync(new BitacoraRequest
-                {
-                    Usuario = "SYSTEM",
-                    Accion = "SRV8_ERROR",
-                    Descripcion = $"Error comunicación externa: {ex.Message}"
-                }, token);
-            });
-        }
-        catch { }
-
         return Results.BadRequest(new TransaccionResponse
         {
             Codigo = -1,
@@ -498,7 +443,7 @@ app.MapPost("/transactions/send", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 
-// ==================== SRV12 - RUTEAR TRANSACCIONES ====================
+//  SRV12 - RUTEAR TRANSACCIONES 
 app.MapPost("/transactions/route", async (
     [FromBody] RuteoTransaccionRequest request,
     HttpContext httpContext,
@@ -590,7 +535,6 @@ app.MapPost("/transactions/route", async (
     #endregion
 
     #region PASO 3: Validar que teléfono origen existe
-    // Simulación - en producción consultaría a la base de datos
     if (!TelefonoExisteEnBD(request.TelefonoOrigen))
     {
         logger.LogWarning("SRV12 - Teléfono origen no asociado: {Telefono}", request.TelefonoOrigen);
@@ -607,21 +551,14 @@ app.MapPost("/transactions/route", async (
 
     if (destinoEsInterno)
     {
-        // FLUJO INTERNO - Llamar a SRV14 (simulado)
-        logger.LogInformation("SRV12 - Destino interno, procesando con SRV14");
-
-        // Simular llamada a core bancario
+        // FLUJO INTERNO
+        logger.LogInformation("SRV12 - Destino interno, procesando...");
         await Task.Delay(300);
 
-        // Simular 90% éxito
         var random = new Random().Next(1, 101);
 
         if (random <= 90)
         {
-            // Registrar bitácora
-            await RegistrarBitacora(app, "SRV12_INTERNAL",
-                $"Transacción interna exitosa: {request.TelefonoOrigen} -> {request.TelefonoDestino}", token);
-
             return Results.Ok(new TransaccionResponse
             {
                 Codigo = 0,
@@ -630,9 +567,6 @@ app.MapPost("/transactions/route", async (
         }
         else
         {
-            await RegistrarBitacora(app, "SRV12_INTERNAL_ERROR",
-                $"Error en core bancario: saldo insuficiente", token);
-
             return Results.BadRequest(new TransaccionResponse
             {
                 Codigo = -1,
@@ -642,7 +576,7 @@ app.MapPost("/transactions/route", async (
     }
     else
     {
-        // FLUJO EXTERNO - Llamar a SRV8
+        // FLUJO EXTERNO
         logger.LogInformation("SRV12 - Destino externo, enviando a SRV8");
 
         try
@@ -652,7 +586,7 @@ app.MapPost("/transactions/route", async (
 
             var externalRequest = new
             {
-                EntidadOrigen = config.GetValue<int>("AppSettings:GrupoEntidadId"),
+                EntidadOrigen = int.Parse(config["AppSettings:GrupoEntidadId"] ?? "1"),
                 TelefonoOrigen = request.TelefonoOrigen,
                 NombreOrigen = request.NombreOrigen,
                 TelefonoDestino = request.TelefonoDestino,
@@ -660,17 +594,12 @@ app.MapPost("/transactions/route", async (
                 Descripcion = request.Descripcion
             };
 
-            // Llamar a SRV8 con el mismo token
             httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
             var response = await httpClient.PostAsJsonAsync($"{srv8Url}/transactions/send", externalRequest);
 
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<TransaccionResponse>();
-
-                await RegistrarBitacora(app, "SRV12_EXTERNAL",
-                    $"Transacción externa enviada a SRV8", token);
-
                 return result != null && result.Codigo == 0
                     ? Results.Ok(result)
                     : Results.BadRequest(result);
@@ -704,29 +633,50 @@ app.MapPost("/transactions/route", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 
-// ==================== SRV18 - BITÁCORA ====================
-app.MapPost("/bitacora", async (
-    [FromBody] BitacoraRequest request,
+//  SRV17 - REPORTE DIARIO 
+app.MapPost("/reportes/diario", async (
+    [FromBody] ReporteDiarioRequest request,
     HttpContext httpContext,
-    [FromServices] BitacoraService bitacoraService) =>
+    [FromServices] ReporteService reporteService) =>
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
-    logger.LogInformation("SRV18 - Registrando bitácora");
+    logger.LogInformation("==========================================");
+    logger.LogInformation("SRV17 - Generando reporte diario");
+    logger.LogInformation("Fecha: {Fecha}", request?.Fecha.ToString("yyyy-MM-dd"));
+    logger.LogInformation("Entidad: {EntidadId}", request?.EntidadId);
+    logger.LogInformation("==========================================");
 
     var token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
+    var tokenParaUsar = token ?? "sistema-token-123456";
 
-    var result = await bitacoraService.RegistrarAsync(request, token);
+    var result = await reporteService.GenerarReporteDiarioAsync(request, tokenParaUsar);
 
-    return result.Codigo == 0
-        ? Results.Created($"/bitacora/{result.BitacoraId}", result)
-        : result.Descripcion.Contains("Token")
-            ? Results.Unauthorized()
-            : Results.BadRequest(result);
+    if (result is ReporteDiarioResponse reporte)
+    {
+        if (reporte.Codigo == 0)
+        {
+            return Results.Ok(reporte);
+        }
+        else if (reporte.Descripcion != null && reporte.Descripcion.Contains("Token"))
+        {
+            return Results.Unauthorized();
+        }
+        else
+        {
+            return Results.BadRequest(reporte);
+        }
+    }
+
+    return Results.BadRequest(new ReporteDiarioResponse
+    {
+        Codigo = -1,
+        Descripcion = "Error inesperado en el servidor"
+    });
 })
-.WithName("RegistrarBitacora")
+.WithName("GenerarReporteDiario")
 .WithOpenApi()
-.Produces<BitacoraResponse>(StatusCodes.Status201Created)
-.Produces<BitacoraResponse>(StatusCodes.Status400BadRequest)
+.Produces<ReporteDiarioResponse>(StatusCodes.Status200OK)
+.Produces<ReporteDiarioResponse>(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status401Unauthorized)
 .Produces(StatusCodes.Status500InternalServerError);
 
@@ -739,7 +689,7 @@ app.MapGet("/health", () => Results.Ok(new
         "POST /transactions/process (SRV7 - público)",
         "POST /transactions/send (SRV8 - requiere token)",
         "POST /transactions/route (SRV12 - requiere token)",
-        "POST /bitacora (SRV18 - requiere token)",
+        "POST /reportes/diario (SRV17 - requiere token)",
         "GET /health"
     }
 }))
@@ -749,7 +699,7 @@ app.MapGet("/health", () => Results.Ok(new
 
 app.Run();
 
-// ==================== MÉTODOS DE AYUDA ====================
+// MÉTODOS DE AYUDA  
 
 async Task<bool> ValidarTokenAsync(string token, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger logger)
 {
@@ -771,22 +721,7 @@ bool TelefonoExisteEnBD(string telefono)
     return telefonosValidos.Contains(telefono);
 }
 
-async Task RegistrarBitacora(WebApplication app, string accion, string descripcion, string token)
-{
-    try
-    {
-        var bitacoraService = app.Services.CreateScope().ServiceProvider.GetRequiredService<BitacoraService>();
-        await bitacoraService.RegistrarAsync(new BitacoraRequest
-        {
-            Usuario = "SYSTEM",
-            Accion = accion,
-            Descripcion = descripcion
-        }, token ?? "sistema-token-123456");
-    }
-    catch { }
-}
-
-// ==================== DTOs ====================
+// DTos para requests y responses
 public class EnvioTransaccionRequest
 {
     public int EntidadOrigen { get; set; }
