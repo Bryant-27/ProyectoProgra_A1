@@ -22,6 +22,8 @@ namespace Servicios
         }
 
         public async Task RegistrarTransferenciaAsync(
+            int entidadOrigenId,
+            int entidadDestinoId,
             string telefonoOrigen,
             string nombreOrigen,
             string telefonoDestino,
@@ -32,11 +34,6 @@ namespace Servicios
         {
             try
             {
-                // Nota: ID_Entidad_Origen y ID_EntidadDestino son requeridos
-                // Como es transferencia interna, usamos la misma entidad (ej. ID 1 = Banco Central)
-                // Tus compañeros deben tener definidas las entidades en su tabla
-                int idEntidad = 1; // Asumimos que 1 es "Banco Central" o tu entidad
-
                 using var connection = new SqlConnection(_connectionString);
                 using var command = new SqlCommand(@"
                     INSERT INTO Transaccion_Envio 
@@ -44,18 +41,19 @@ namespace Servicios
                      Telefono_Destino, Monto, Descripcion, FechaEnvio, Codigo_Respuesta, 
                      Mensaje_Respuesta, ID_Estado)
                     VALUES 
-                    (@entidad, @entidad, @telOrigen, @nombreOrigen, 
+                    (@entidadOrigen, @entidadDestino, @telOrigen, @nombreOrigen, 
                      @telDestino, @monto, @descripcion, GETDATE(), @codigo, 
                      @mensaje, 4)", connection); // Estado 4 = Completado
 
-                command.Parameters.AddWithValue("@entidad", idEntidad);
-                command.Parameters.AddWithValue("@telOrigen", telefonoOrigen);
-                command.Parameters.AddWithValue("@nombreOrigen", nombreOrigen ?? "Sistema");
-                command.Parameters.AddWithValue("@telDestino", telefonoDestino);
+                command.Parameters.AddWithValue("@entidadOrigen", entidadOrigenId);
+                command.Parameters.AddWithValue("@entidadDestino", entidadDestinoId);
+                command.Parameters.AddWithValue("@telOrigen", telefonoOrigen ?? "");
+                command.Parameters.AddWithValue("@nombreOrigen", nombreOrigen ?? "");
+                command.Parameters.AddWithValue("@telDestino", telefonoDestino ?? "");
                 command.Parameters.AddWithValue("@monto", monto);
-                command.Parameters.AddWithValue("@descripcion", descripcion ?? "Transferencia");
+                command.Parameters.AddWithValue("@descripcion", descripcion ?? "");
                 command.Parameters.AddWithValue("@codigo", codigoRespuesta);
-                command.Parameters.AddWithValue("@mensaje", mensajeRespuesta);
+                command.Parameters.AddWithValue("@mensaje", mensajeRespuesta ?? "");
 
                 await connection.OpenAsync();
                 await command.ExecuteNonQueryAsync();
@@ -77,7 +75,8 @@ namespace Servicios
                     descripcion: $"Error al registrar transferencia: {ex.Message}",
                     servicio: "TransaccionEnvioService.RegistrarTransferenciaAsync"
                 );
-                // No relanzamos la excepción para no interrumpir el flujo principal
+                // Relanzamos para que el llamador sepa que falló
+                throw;
             }
         }
     }

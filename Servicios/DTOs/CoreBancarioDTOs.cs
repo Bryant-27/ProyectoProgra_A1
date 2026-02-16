@@ -70,29 +70,38 @@ namespace Servicios.DTOs
     // DTO para solicitud de transferencia entre cuentas
     public class TransferenciaRequestDto
     {
+        // Origen
         [JsonPropertyName("identificacionOrigen")]
         public string IdentificacionOrigen { get; set; } = string.Empty;
 
         [JsonPropertyName("cuentaOrigen")]
         public string CuentaOrigen { get; set; } = string.Empty;
 
+        [JsonPropertyName("telefonoOrigen")]
+        public string TelefonoOrigen { get; set; } = string.Empty;
+
+        [JsonPropertyName("nombreOrigen")]
+        public string NombreOrigen { get; set; } = string.Empty;
+
+        [JsonPropertyName("entidadOrigenId")]
+        public int EntidadOrigenId { get; set; }  // NUEVO
+
+        // Destino
         [JsonPropertyName("identificacionDestino")]
         public string IdentificacionDestino { get; set; } = string.Empty;
 
         [JsonPropertyName("cuentaDestino")]
         public string CuentaDestino { get; set; } = string.Empty;
 
+        [JsonPropertyName("telefonoDestino")]
+        public string TelefonoDestino { get; set; } = string.Empty;
+
+        [JsonPropertyName("entidadDestinoId")]
+        public int EntidadDestinoId { get; set; }  // NUEVO
+
+        // Transferencia
         [JsonPropertyName("monto")]
         public decimal Monto { get; set; }
-
-        [JsonPropertyName("telefonoOrigen")]
-        public string? TelefonoOrigen { get; set; }
-
-        [JsonPropertyName("nombreOrigen")]
-        public string? NombreOrigen { get; set; }
-
-        [JsonPropertyName("telefonoDestino")]
-        public string? TelefonoDestino { get; set; }
 
         [JsonPropertyName("referenciaExterna")]
         public string? ReferenciaExterna { get; set; }

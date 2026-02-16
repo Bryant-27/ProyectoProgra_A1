@@ -28,9 +28,11 @@ namespace Servicios.Interfaces
             string identificacionDestino,
             string cuentaDestino,
             decimal monto,
-            string? telefonoOrigen = null,
-            string? nombreOrigen = null,
-            string? telefonoDestino = null,
+            int entidadOrigenId,
+            int entidadDestinoId,
+            string telefonoOrigen,
+            string nombreOrigen,
+            string telefonoDestino,
             string? referenciaExterna = null,
             string? descripcion = null);
     }

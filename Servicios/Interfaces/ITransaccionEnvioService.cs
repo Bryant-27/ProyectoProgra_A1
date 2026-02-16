@@ -9,6 +9,8 @@ namespace Servicios.Interfaces
     public interface ITransaccionEnvioService
     {
         Task RegistrarTransferenciaAsync(
+            int entidadOrigenId,
+            int entidadDestinoId,
             string telefonoOrigen,
             string nombreOrigen,
             string telefonoDestino,

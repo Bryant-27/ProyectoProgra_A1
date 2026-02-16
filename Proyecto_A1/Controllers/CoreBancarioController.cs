@@ -309,6 +309,7 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
+                // Validaciones de origen
                 if (string.IsNullOrWhiteSpace(request.IdentificacionOrigen))
                 {
                     return BadRequest(new CoreResponseDto
@@ -327,6 +328,34 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
+                if (string.IsNullOrWhiteSpace(request.TelefonoOrigen))
+                {
+                    return BadRequest(new CoreResponseDto
+                    {
+                        Codigo = -1,
+                        Descripcion = "Teléfono de origen requerido"
+                    });
+                }
+
+                if (string.IsNullOrWhiteSpace(request.NombreOrigen))
+                {
+                    return BadRequest(new CoreResponseDto
+                    {
+                        Codigo = -1,
+                        Descripcion = "Nombre de origen requerido"
+                    });
+                }
+
+                if (request.EntidadOrigenId <= 0)
+                {
+                    return BadRequest(new CoreResponseDto
+                    {
+                        Codigo = -1,
+                        Descripcion = "ID de entidad origen inválido"
+                    });
+                }
+
+                // Validaciones de destino
                 if (string.IsNullOrWhiteSpace(request.IdentificacionDestino))
                 {
                     return BadRequest(new CoreResponseDto
@@ -345,6 +374,25 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
+                if (string.IsNullOrWhiteSpace(request.TelefonoDestino))
+                {
+                    return BadRequest(new CoreResponseDto
+                    {
+                        Codigo = -1,
+                        Descripcion = "Teléfono de destino requerido"
+                    });
+                }
+
+                if (request.EntidadDestinoId <= 0)
+                {
+                    return BadRequest(new CoreResponseDto
+                    {
+                        Codigo = -1,
+                        Descripcion = "ID de entidad destino inválido"
+                    });
+                }
+
+                // Validación de monto
                 if (request.Monto <= 0)
                 {
                     return BadRequest(new CoreResponseDto
@@ -354,6 +402,7 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
+                // No permitir transferencia a la misma cuenta
                 if (request.CuentaOrigen == request.CuentaDestino &&
                     request.IdentificacionOrigen == request.IdentificacionDestino)
                 {
@@ -366,13 +415,18 @@ namespace Proyecto_A1.Controllers
 
                 // Procesar transferencia
                 var (exito, mensaje, saldoOrigenNuevo, saldoDestinoNuevo) = await _coreService.TransferirAsync(
-                    request.IdentificacionOrigen,
-                    request.CuentaOrigen,
-                    request.IdentificacionDestino,
-                    request.CuentaDestino,
-                    request.Monto,
-                    request.ReferenciaExterna,
-                    request.Descripcion
+                    identificacionOrigen: request.IdentificacionOrigen,
+                    cuentaOrigen: request.CuentaOrigen,
+                    identificacionDestino: request.IdentificacionDestino,
+                    cuentaDestino: request.CuentaDestino,
+                    monto: request.Monto,
+                    entidadOrigenId: request.EntidadOrigenId,
+                    entidadDestinoId: request.EntidadDestinoId,
+                    telefonoOrigen: request.TelefonoOrigen,
+                    nombreOrigen: request.NombreOrigen,
+                    telefonoDestino: request.TelefonoDestino,
+                    referenciaExterna: request.ReferenciaExterna,
+                    descripcion: request.Descripcion
                 );
 
                 if (!exito)

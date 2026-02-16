@@ -244,16 +244,18 @@ namespace Servicios
 
         // Transferencia entre cuentas
         public async Task<(bool exito, string mensaje, decimal? saldoOrigenNuevo, decimal? saldoDestinoNuevo)> TransferirAsync(
-            string identificacionOrigen,
-            string cuentaOrigen,
-            string identificacionDestino,
-            string cuentaDestino,
-            decimal monto,
-            string? telefonoOrigen = null,
-            string? nombreOrigen = null,
-            string? telefonoDestino = null,
-            string? referenciaExterna = null,
-            string? descripcion = null)
+        string identificacionOrigen,
+        string cuentaOrigen,
+        string identificacionDestino,
+        string cuentaDestino,
+        decimal monto,
+        int entidadOrigenId,
+        int entidadDestinoId,
+        string telefonoOrigen,
+        string nombreOrigen,
+        string telefonoDestino,
+        string? referenciaExterna = null,
+        string? descripcion = null)
         {
             try
             {
@@ -330,17 +332,19 @@ namespace Servicios
 
                     await transaction.CommitAsync();
 
-                    //registramos en Transaccion_Envio usando el servicio inyectado
+                    // Registrar en Transaccion_Envio con los datos correctos
                     try
                     {
                         await _transaccionEnvioService.RegistrarTransferenciaAsync(
-                            telefonoOrigen ?? "00000000",
-                            nombreOrigen ?? origen.Cliente?.NombreCompleto ?? "Desconocido",
-                            telefonoDestino ?? "00000000",
-                            monto,
-                            descripcion ?? "Transferencia",
-                            0,
-                            "Transferencia exitosa"
+                            entidadOrigenId: entidadOrigenId,
+                            entidadDestinoId: entidadDestinoId,
+                            telefonoOrigen: telefonoOrigen,
+                            nombreOrigen: nombreOrigen,
+                            telefonoDestino: telefonoDestino,
+                            monto: monto,
+                            descripcion: descripcion ?? "Transferencia",
+                            codigoRespuesta: 200,  // Código HTTP de éxito
+                            mensajeRespuesta: "Transferencia exitosa"
                         );
                     }
                     catch (Exception ex)
