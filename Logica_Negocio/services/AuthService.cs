@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+﻿/* DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -120,3 +120,4 @@ namespace Logica_Negocio.Services
         public string? Rol { get; set; }
     }
 }
+*/ 

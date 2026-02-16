@@ -2,14 +2,8 @@
 
 namespace Entities.DTOs
 {
-    public class TransaccionRequest
+    public class RuteoTransaccionRequest
     {
-        [JsonPropertyName("entidadOrigen")]
-        public int EntidadOrigen { get; set; }
-
-        [JsonPropertyName("entidadDestino")]
-        public int EntidadDestino { get; set; }
-
         [JsonPropertyName("telefonoOrigen")]
         public string TelefonoOrigen { get; set; }
 

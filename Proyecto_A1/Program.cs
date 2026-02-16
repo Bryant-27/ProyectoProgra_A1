@@ -1,204 +1,419 @@
-using DataAccess.Models;
-using Logica_Negocio.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Entities.DTOs;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Proyecto_A1;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
+using System;
+using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllers(); // Agregar soporte para controllers
+// Configurar Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "API Pagos M�viles",
+        Title = "Pagos Móviles API - SRV7 y SRV8",
         Version = "v1",
-        Description = "API para sistema de pagos m�viles - Historias SRV7, SRV8, SRV12, SRV17"
-    });
-
-    // Configurar autenticaci�n JWT en Swagger
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header usando el esquema Bearer. Ejemplo: \"Authorization: Bearer {token}\"",
-        Name = "Authorization",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
-    {
-        {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+        Description = "API para recibir y enviar transacciones de pagos móviles"
     });
 });
 
-// Configurar DbContext
-builder.Services.AddDbContext<PagosMovilesContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Registrar servicios
-builder.Services.AddScoped<TransaccionService>();
-builder.Services.AddScoped<AuthService>();
-
-// Configurar autenticaci�n JWT
-var jwtKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrEmpty(jwtKey))
-{
-    jwtKey = "SuperSecretKeyForPagosMovilesAPIMinimo32Characters1234567890";
-    Console.WriteLine("Advertencia: Usando clave JWT por defecto. Configura 'Jwt:Key' en appsettings.json para producci�n.");
-}
-
-var key = Encoding.ASCII.GetBytes(jwtKey);
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false, // Cambiar a true en producci�n
-        ValidateAudience = false, // Cambiar a true en producci�n
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero
-    };
-
-    // Para depuraci�n: log de errores de token
-    options.Events = new JwtBearerEvents
-    {
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            Console.WriteLine("Token validated successfully");
-            return Task.CompletedTask;
-        }
-    };
-});
-
-builder.Services.AddAuthorization(options =>
-{
-    // Pol�tica por defecto requiere autenticaci�n
-    options.FallbackPolicy = options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-});
-
-// Configurar CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", builder =>
-    {
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader();
-    });
-});
+// Registrar HttpClient
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Swagger UI
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "API Pagos M�viles v1");
-        c.RoutePrefix = string.Empty; // Para acceder en ra�z: http://localhost:xxxx/
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Pagos Móviles API v1");
+    c.RoutePrefix = "swagger";
+});
 
 app.UseHttpsRedirection();
 
-// Habilitar CORS
-app.UseCors("AllowAll");
-
-// Middleware de autenticaci�n y autorizaci�n
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Mapear endpoints existentes
-app.MapUsuariosEndpoints();
-
-// Mapear nuevos endpoints de transacciones
-app.MapTransaccionesEndpoints();
-
-// Endpoint de prueba
-app.MapGet("/", () => "API Pagos M�viles - SRV7, SRV8, SRV12, SRV17 funcionando")
-    .AllowAnonymous()
-    .WithName("API Home")
-    .WithOpenApi();
-
-// Endpoint de salud
-app.MapGet("/health", () =>
+// ==================== SRV7 - RECIBIR TRANSACCIONES (PÚBLICO) ====================
+app.MapPost("/transactions/process", async (
+    [FromBody] TransaccionRequest request,
+    IHttpClientFactory httpClientFactory,
+    IConfiguration config) =>
 {
-    return Results.Ok(new
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+    logger.LogInformation("==========================================");
+    logger.LogInformation("SRV7 - Recibiendo transacción");
+    logger.LogInformation("De: {TelefonoOrigen} - {NombreOrigen}", request?.TelefonoOrigen, request?.NombreOrigen);
+    logger.LogInformation("Para: {TelefonoDestino}", request?.TelefonoDestino);
+    logger.LogInformation("Monto: ₡{Monto:N2}", request?.Monto);
+    logger.LogInformation("==========================================");
+
+    // Validar request nulo
+    if (request == null)
     {
-        status = "healthy",
-        timestamp = DateTime.Now,
-        services = new[] { "SRV7", "SRV8", "SRV12", "SRV17" }
-    });
-})
-.AllowAnonymous()
-.WithName("Health Check")
-.WithOpenApi();
-
-// Endpoint de login (HU SRV5)
-app.MapPost("/api/login", async (
-    HttpContext httpContext,
-    [FromBody] LoginRequest loginRequest,
-    [FromServices] AuthService authService) =>
-{
-    if (string.IsNullOrEmpty(loginRequest.Usuario) || string.IsNullOrEmpty(loginRequest.Contrasena))
-        return Results.BadRequest(new { error = "Usuario y contrase�a son requeridos" });
-
-    var result = await authService.LoginAsync(loginRequest.Usuario, loginRequest.Contrasena);
-
-    if (result.Success)
-    {
-        return Results.Ok(new
+        return Results.BadRequest(new TransaccionResponse
         {
-            access_token = result.Token,
-            expires_in = 300, // 5 minutos en segundos
-            refresh_token = Guid.NewGuid().ToString(), // Simplificado
-            usuarioID = result.UsuarioId
+            Codigo = -1,
+            Descripcion = "Debe enviar los datos completos y válidos"
         });
     }
 
-    return Results.Unauthorized();
+    // Validar campos requeridos
+    if (string.IsNullOrWhiteSpace(request.TelefonoOrigen) ||
+        string.IsNullOrWhiteSpace(request.NombreOrigen) ||
+        string.IsNullOrWhiteSpace(request.TelefonoDestino) ||
+        string.IsNullOrWhiteSpace(request.Descripcion))
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "Debe enviar los datos completos y válidos"
+        });
+    }
+
+    // Validar teléfono origen
+    if (request.TelefonoOrigen.Length != 8 || !request.TelefonoOrigen.All(char.IsDigit))
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "El teléfono origen debe tener 8 dígitos numéricos"
+        });
+    }
+
+    // Validar teléfono destino
+    if (request.TelefonoDestino.Length != 8 || !request.TelefonoDestino.All(char.IsDigit))
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "El teléfono destino debe tener 8 dígitos numéricos"
+        });
+    }
+
+    // Validar descripción
+    if (request.Descripcion.Length > 25)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "La descripción no puede superar 25 caracteres"
+        });
+    }
+
+    // Validar monto
+    if (request.Monto <= 0)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "El monto debe ser mayor a cero"
+        });
+    }
+
+    if (request.Monto > 100000)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "El monto no debe ser superior a 100.000"
+        });
+    }
+
+    // Validar entidad destino
+    var grupoEntidadId = config.GetValue<int>("AppSettings:GrupoEntidadId");
+    if (request.EntidadDestino != grupoEntidadId)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "La entidad destino no es válida"
+        });
+    }
+
+    // Validar entidad origen (simulado)
+    if (request.EntidadOrigen != 1)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "La entidad origen no está registrada o no está activa"
+        });
+    }
+
+    // TODO: Aquí llamarías a SRV12 para enrutar
+    // Por ahora simulamos éxito
+
+    // Bitácora simulada
+    _ = Task.Run(() => {
+        logger.LogInformation("BITACORA - Transacción recibida y procesada");
+    });
+
+    return Results.Ok(new TransaccionResponse
+    {
+        Codigo = 0,
+        Descripcion = "Transacción aplicada"
+    });
 })
-.AllowAnonymous()
-.WithName("Login")
-.WithOpenApi();
+.WithName("ProcessTransaction")
+.WithOpenApi()
+.Produces<TransaccionResponse>(StatusCodes.Status200OK)
+.Produces<TransaccionResponse>(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status500InternalServerError)
+.AllowAnonymous(); // Público - sin token
+
+
+// ==================== SRV8 - ENVIAR TRANSACCIONES A ENTIDADES EXTERNAS ====================
+app.MapPost("/transactions/send", async (
+    [FromBody] EnvioTransaccionRequest request,
+    HttpContext httpContext,
+    IHttpClientFactory httpClientFactory,
+    IConfiguration config) =>
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+    logger.LogInformation("==========================================");
+    logger.LogInformation("SRV8 - Enviando transacción a entidad externa");
+    logger.LogInformation("Entidad Origen: {EntidadOrigen}", request?.EntidadOrigen);
+    logger.LogInformation("Teléfono Origen: {TelefonoOrigen}", request?.TelefonoOrigen);
+    logger.LogInformation("Nombre Origen: {NombreOrigen}", request?.NombreOrigen);
+    logger.LogInformation("Teléfono Destino: {TelefonoDestino}", request?.TelefonoDestino);
+    logger.LogInformation("Monto: ₡{Monto:N2}", request?.Monto);
+    logger.LogInformation("Descripción: {Descripcion}", request?.Descripcion);
+    logger.LogInformation("==========================================");
+
+    #region PASO 1: Validar token de autorización
+    var token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
+
+    if (string.IsNullOrEmpty(token))
+    {
+        logger.LogWarning("SRV8 - Token no proporcionado");
+        return Results.Unauthorized();
+    }
+
+    // Validar token con SRV5 (simulado)
+    var tokenValido = await ValidarTokenAsync(token, httpClientFactory, config, logger);
+    if (!tokenValido)
+    {
+        logger.LogWarning("SRV8 - Token inválido");
+        return Results.Unauthorized();
+    }
+    #endregion
+
+    #region PASO 2: Validar request
+    if (request == null)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "Debe enviar los datos completos y válidos"
+        });
+    }
+
+    // Validar campos requeridos
+    if (string.IsNullOrWhiteSpace(request.TelefonoOrigen) ||
+        string.IsNullOrWhiteSpace(request.NombreOrigen) ||
+        string.IsNullOrWhiteSpace(request.TelefonoDestino) ||
+        string.IsNullOrWhiteSpace(request.Descripcion))
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "Debe enviar los datos completos y válidos"
+        });
+    }
+
+    // Validar entidad origen (debe ser la del grupo)
+    var grupoEntidadId = config.GetValue<int>("AppSettings:GrupoEntidadId");
+    if (request.EntidadOrigen != grupoEntidadId)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "La entidad origen debe ser la entidad del grupo"
+        });
+    }
+
+    // Validar teléfono origen (debe existir en BD - simulado)
+    if (!TelefonoExisteEnBD(request.TelefonoOrigen))
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "El teléfono origen no está registrado en pagos móviles"
+        });
+    }
+
+    // Validar teléfono destino
+    if (request.TelefonoDestino.Length != 8 || !request.TelefonoDestino.All(char.IsDigit))
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "El teléfono destino debe tener 8 dígitos numéricos"
+        });
+    }
+
+    // Validar descripción
+    if (request.Descripcion.Length > 25)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "La descripción no puede superar 25 caracteres"
+        });
+    }
+
+    // Validar monto
+    if (request.Monto <= 0 || request.Monto > 100000)
+    {
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "El monto no debe ser superior a 100.000"
+        });
+    }
+    #endregion
+
+    #region PASO 3: Enviar a entidad externa
+    try
+    {
+        var externalServiceUrl = config["Services:ExternalService"] ?? "https://api.bancoexterno.com";
+        logger.LogInformation("SRV8 - Enviando a entidad externa: {Url}", externalServiceUrl);
+
+        var httpClient = httpClientFactory.CreateClient();
+
+        // Preparar request para el servicio externo
+        var externalRequest = new
+        {
+            TelefonoOrigen = request.TelefonoOrigen,
+            NombreOrigen = request.NombreOrigen,
+            TelefonoDestino = request.TelefonoDestino,
+            Monto = request.Monto,
+            Descripcion = request.Descripcion
+        };
+
+        // Simular llamada a servicio externo (en producción sería una llamada HTTP real)
+        await Task.Delay(500); // Simular latencia
+
+        // Simular respuesta (80% éxito, 20% error)
+        var random = new Random().Next(1, 101);
+
+        TransaccionResponse resultado;
+
+        if (random <= 80)
+        {
+            resultado = new TransaccionResponse
+            {
+                Codigo = 0,
+                Descripcion = "Transacción enviada exitosamente a entidad externa"
+            };
+            logger.LogInformation("SRV8 - Éxito al enviar a entidad externa");
+        }
+        else
+        {
+            resultado = new TransaccionResponse
+            {
+                Codigo = -1,
+                Descripcion = "Error en entidad externa: saldo insuficiente"
+            };
+            logger.LogWarning("SRV8 - Error al enviar a entidad externa");
+        }
+
+        // Bitácora
+        _ = Task.Run(() => {
+            logger.LogInformation("BITACORA - Transacción enviada a externo: {Codigo}", resultado.Codigo);
+        });
+
+        // Retornar la misma respuesta del servicio externo
+        return resultado.Codigo == 0
+            ? Results.Ok(resultado)
+            : Results.BadRequest(resultado);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "SRV8 - Error al comunicarse con entidad externa");
+
+        return Results.BadRequest(new TransaccionResponse
+        {
+            Codigo = -1,
+            Descripcion = "Error de comunicación con entidad externa"
+        });
+    }
+    #endregion
+})
+.WithName("SendTransaction")
+.WithOpenApi()
+.Produces<TransaccionResponse>(StatusCodes.Status200OK)
+.Produces<TransaccionResponse>(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status401Unauthorized)
+.Produces(StatusCodes.Status500InternalServerError);
+
+// Health check
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "API SRV7 y SRV8 funcionando",
+    timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+    endpoints = new[] {
+        "POST /transactions/process (público)",
+        "POST /transactions/send (requiere token)"
+    }
+}))
+.WithName("HealthCheck")
+.WithOpenApi()
+.AllowAnonymous();
 
 app.Run();
 
-// DTO para login
-public class LoginRequest
+// ==================== MÉTODOS DE AYUDA ====================
+
+// Método para validar token con SRV5
+async Task<bool> ValidarTokenAsync(string token, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger logger)
 {
-    public string Usuario { get; set; } = null!;
-    public string Contrasena { get; set; } = null!;
+    try
+    {
+        // En producción, esto llamaría a SRV5: /auth/validate
+        // Simulación: token válido si tiene más de 10 caracteres
+        await Task.Delay(50); // Simular latencia
+
+        // Simulación simple - en producción esto llamaría a un servicio real
+        return !string.IsNullOrEmpty(token) && token.Length > 10;
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error validando token");
+        return false;
+    }
 }
+
+// Método para simular validación de teléfono en BD
+bool TelefonoExisteEnBD(string telefono)
+{
+    // Simulación - en producción consultaría a la base de datos
+    // Aquí asumimos que algunos teléfonos existen
+    var telefonosValidos = new[] { "88881111", "88882222", "88883333", "88884444" };
+    return telefonosValidos.Contains(telefono);
+}
+
+
+// ==================== DTOs ADICIONALES PARA SRV8 ====================
+public class EnvioTransaccionRequest
+{
+    public int EntidadOrigen { get; set; }
+    public string TelefonoOrigen { get; set; }
+    public string NombreOrigen { get; set; }
+    public string TelefonoDestino { get; set; }
+    public decimal Monto { get; set; }
+    public string Descripcion { get; set; }
+}
+
+public partial class Program { }
