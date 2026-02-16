@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DataAccess.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Models;
 using System;
@@ -35,35 +36,44 @@ namespace DataAccess.Repositories
             }
         }
 
+        // 👇 AGREGAR ESTE MÉTODO
         public async Task<List<Bitacora>> ListarAsync(
-            string usuario = null,
+            string? usuario = null,
             DateTime? fechaInicio = null,
             DateTime? fechaFin = null,
-            string accion = null,
-            string resultado = null,
+            string? accion = null,
+            string? resultado = null,
             int limite = 100)
         {
-            var query = _context.Bitacoras.AsQueryable();
+            try
+            {
+                var query = _context.Bitacoras.AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(usuario))
-                query = query.Where(b => b.Usuario.Contains(usuario));
+                if (!string.IsNullOrWhiteSpace(usuario))
+                    query = query.Where(b => b.Usuario.Contains(usuario));
 
-            if (fechaInicio.HasValue)
-                query = query.Where(b => b.FechaRegistro >= fechaInicio.Value);
+                if (fechaInicio.HasValue)
+                    query = query.Where(b => b.FechaRegistro >= fechaInicio.Value);
 
-            if (fechaFin.HasValue)
-                query = query.Where(b => b.FechaRegistro <= fechaFin.Value);
+                if (fechaFin.HasValue)
+                    query = query.Where(b => b.FechaRegistro <= fechaFin.Value);
 
-            if (!string.IsNullOrWhiteSpace(accion))
-                query = query.Where(b => b.Accion == accion);
+                if (!string.IsNullOrWhiteSpace(accion))
+                    query = query.Where(b => b.Accion == accion);
 
-            if (!string.IsNullOrWhiteSpace(resultado))
-                query = query.Where(b => b.Resultado == resultado);
+                if (!string.IsNullOrWhiteSpace(resultado))
+                    query = query.Where(b => b.Resultado == resultado);
 
-            return await query
-                .OrderByDescending(b => b.FechaRegistro)
-                .Take(limite)
-                .ToListAsync();
+                return await query
+                    .OrderByDescending(b => b.FechaRegistro)
+                    .Take(limite)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error listando bitácoras");
+                throw;
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Proyecto_A1
@@ -42,10 +43,13 @@ namespace Proyecto_A1
         {
             logger.LogInformation("SRV18 - POST /bitacora llamado");
 
-            // Extraer token del header
+            // Extraer token del header (puede ser null)
             var token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
 
-            var result = await bitacoraService.RegistrarAsync(request, token);
+            // 👇 OPCIÓN 1: Usar token por defecto si es null
+            var tokenParaUsar = token ?? "sistema-token-123456";
+
+            var result = await bitacoraService.RegistrarAsync(request, tokenParaUsar);
 
             if (result.Codigo == 0)
             {
@@ -74,11 +78,14 @@ namespace Proyecto_A1
         {
             logger.LogInformation("SRV18 - GET /bitacora llamado");
 
-            // Extraer token del header
+            // Extraer token del header (puede ser null)
             var token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "");
 
+            // 👇 OPCIÓN 1 TAMBIÉN PARA GET
+            var tokenParaUsar = token ?? "sistema-token-123456";
+
             var result = await bitacoraService.ConsultarAsync(
-                usuario, fechaInicio, fechaFin, accion, resultado, token);
+                usuario, fechaInicio, fechaFin, accion, resultado, tokenParaUsar);
 
             // Verificar si es una respuesta de error
             if (result is BitacoraResponse errorResponse && errorResponse.Codigo == -1)

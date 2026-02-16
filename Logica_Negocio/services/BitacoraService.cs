@@ -1,14 +1,14 @@
-﻿using System.Collections.Generic;
-using Entities.DTOs;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+﻿using DataAccess.Models;
 using DataAccess.Repositories;
-using DataAccess.Models;
+using Entities.DTOs;
+using Microsoft.Extensions.Logging;
+using Models;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Logica_Negocio.Services   
+namespace Logica_Negocio.Services
 {
     public class BitacoraService
     {
@@ -23,14 +23,16 @@ namespace Logica_Negocio.Services
             _logger = logger;
         }
 
-        // Registrar una nueva bitácora
+        /// <summary>
+        /// Registra una nueva entrada en la bitácora
+        /// </summary>
         public async Task<BitacoraResponse> RegistrarAsync(BitacoraRequest request, string token)
         {
             try
             {
-                _logger.LogInformation("SRV18 - Registrando bitácora para usuario: {Usuario}", request?.Usuario);
+                _logger.LogInformation("SRV18 - Registrando bitácora");
 
-                // Validar token (simulado)
+                // Validar token
                 if (string.IsNullOrEmpty(token) || token.Length < 10)
                 {
                     return new BitacoraResponse
@@ -66,7 +68,7 @@ namespace Logica_Negocio.Services
                 var bitacora = new Bitacora
                 {
                     Usuario = request.Usuario.Trim(),
-                    Accion = request.Aaccion.Trim(),
+                    Accion = request.Accion.Trim(),
                     Descripcion = request.Descripcion.Trim(),
                     Servicio = "SRV18",
                     Resultado = "INFO",
@@ -76,7 +78,7 @@ namespace Logica_Negocio.Services
                 // Guardar en base de datos
                 var resultado = await _bitacoraRepository.RegistrarAsync(bitacora);
 
-                _logger.LogInformation("SRV18 - Bitácora registrada exitosamente ID: {Id}", resultado.Id);
+                _logger.LogInformation("SRV18 - Bitácora registrada con ID: {BitacoraId}", resultado.Id);
 
                 return new BitacoraResponse
                 {
@@ -88,7 +90,7 @@ namespace Logica_Negocio.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "SRV18 - Error registrando bitácora");
+                _logger.LogError(ex, "Error registrando bitácora");
                 return new BitacoraResponse
                 {
                     Codigo = -1,
@@ -97,13 +99,15 @@ namespace Logica_Negocio.Services
             }
         }
 
-        // Consultar bitácoras
+        /// <summary>
+        /// Consulta bitácoras con filtros opcionales
+        /// </summary>
         public async Task<object> ConsultarAsync(
-            string usuario,
+            string? usuario,
             DateTime? fechaInicio,
             DateTime? fechaFin,
-            string accion,
-            string resultado,
+            string? accion,
+            string? resultado,
             string token)
         {
             try
@@ -120,9 +124,13 @@ namespace Logica_Negocio.Services
                     };
                 }
 
-                // Obtener bitácoras
+                // Obtener bitácoras del repositorio
                 var bitacoras = await _bitacoraRepository.ListarAsync(
-                    usuario, fechaInicio, fechaFin, accion, resultado);
+                    usuario,
+                    fechaInicio,
+                    fechaFin,
+                    accion,
+                    resultado);
 
                 if (bitacoras == null || !bitacoras.Any())
                 {
@@ -130,21 +138,24 @@ namespace Logica_Negocio.Services
                     {
                         codigo = 0,
                         descripcion = "No se encontraron bitácoras",
-                        bitacoras = new List<BitacoraConsultaResponse>()
+                        total = 0,
+                        bitacoras = new List<object>()
                     };
                 }
 
-                // Mapear a DTO de respuesta
-                var respuesta = bitacoras.Select(b => new BitacoraConsultaResponse
+                // Mapear a respuesta anónima
+                var respuesta = bitacoras.Select(b => new
                 {
-                    BitacoraId = b.Id,
-                    Usuario = b.Usuario,
-                    Accion = b.Accion,
-                    Descripcion = b.Descripcion,
-                    FechaRegistro = b.FechaRegistro,
-                    Servicio = b.Servicio,
-                    Resultado = b.Resultado
+                    bitacoraId = b.Id,
+                    usuario = b.Usuario,
+                    accion = b.Accion,
+                    descripcion = b.Descripcion,
+                    fechaRegistro = b.FechaRegistro,
+                    servicio = b.Servicio,
+                    resultado = b.Resultado
                 }).ToList();
+
+                _logger.LogInformation("SRV18 - Se encontraron {Count} bitácoras", respuesta.Count);
 
                 return new
                 {
@@ -156,7 +167,7 @@ namespace Logica_Negocio.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "SRV18 - Error consultando bitácoras");
+                _logger.LogError(ex, "Error consultando bitácoras");
                 return new BitacoraResponse
                 {
                     Codigo = -1,

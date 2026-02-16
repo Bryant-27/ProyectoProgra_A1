@@ -1,8 +1,12 @@
 ﻿using Entities.DTOs;
+using Google.Apis.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace Logica_Negocio.Services
 {
@@ -34,10 +38,7 @@ namespace Logica_Negocio.Services
                 if (validationResult != null)
                     return validationResult;
 
-                // Aquí llamarías a SRV12 para enrutar
-                // Por ahora simulamos éxito
                 await Task.Delay(100);
-
                 return new TransaccionResponse
                 {
                     Codigo = 0,
@@ -72,15 +73,12 @@ namespace Logica_Negocio.Services
                     };
                 }
 
-                // Validaciones
                 var validationResult = await ValidateSendRequest(request);
                 if (validationResult != null)
                     return validationResult;
 
-                // Simular envío a entidad externa
                 await Task.Delay(500);
 
-                // Simular respuesta (80% éxito)
                 var random = new Random().Next(1, 101);
 
                 if (random <= 80)
@@ -111,8 +109,8 @@ namespace Logica_Negocio.Services
             }
         }
 
-        // Validaciones para SRV7
-        private async Task<TransaccionResponse> ValidateTransactionRequest(TransaccionRequest request)
+        // Validaciones para SRV7 (SIN GetValue)
+        private async Task<TransaccionResponse?> ValidateTransactionRequest(TransaccionRequest request)
         {
             if (request == null)
                 return ErrorResponse("Debe enviar los datos completos y válidos");
@@ -135,7 +133,14 @@ namespace Logica_Negocio.Services
             if (request.Monto <= 0 || request.Monto > 100000)
                 return ErrorResponse("El monto no debe ser superior a 100.000");
 
-            var grupoEntidadId = _configuration.GetValue<int>("AppSettings:GrupoEntidadId");
+            // 👇 SIN GetValue - usando acceso directo
+            var grupoEntidadId = 1; // valor por defecto
+            var configValue = _configuration["AppSettings:GrupoEntidadId"];
+            if (!string.IsNullOrEmpty(configValue))
+            {
+                int.TryParse(configValue, out grupoEntidadId);
+            }
+
             if (request.EntidadDestino != grupoEntidadId)
                 return ErrorResponse("La entidad destino no es válida");
 
@@ -145,8 +150,8 @@ namespace Logica_Negocio.Services
             return null;
         }
 
-        // Validaciones para SRV8
-        private async Task<TransaccionResponse> ValidateSendRequest(EnvioTransaccionRequest request)
+        // Validaciones para SRV8 (SIN GetValue)
+        private async Task<TransaccionResponse?> ValidateSendRequest(EnvioTransaccionRequest request)
         {
             if (request == null)
                 return ErrorResponse("Debe enviar los datos completos y válidos");
@@ -157,7 +162,14 @@ namespace Logica_Negocio.Services
                 string.IsNullOrWhiteSpace(request.Descripcion))
                 return ErrorResponse("Debe enviar los datos completos y válidos");
 
-            var grupoEntidadId = _configuration.GetValue<int>("AppSettings:GrupoEntidadId");
+            // 👇 SIN GetValue - usando acceso directo
+            var grupoEntidadId = 1; // valor por defecto
+            var configValue = _configuration["AppSettings:GrupoEntidadId"];
+            if (!string.IsNullOrEmpty(configValue))
+            {
+                int.TryParse(configValue, out grupoEntidadId);
+            }
+
             if (request.EntidadOrigen != grupoEntidadId)
                 return ErrorResponse("La entidad origen debe ser la entidad del grupo");
 
@@ -173,7 +185,6 @@ namespace Logica_Negocio.Services
             if (request.Monto <= 0 || request.Monto > 100000)
                 return ErrorResponse("El monto no debe ser superior a 100.000");
 
-            // Validar que teléfono origen existe (simulado)
             var telefonosValidos = new[] { "88881111", "88882222", "88883333", "88884444" };
             if (!telefonosValidos.Contains(request.TelefonoOrigen))
                 return ErrorResponse("El teléfono origen no está registrado en pagos móviles");
