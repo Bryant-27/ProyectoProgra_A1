@@ -1,12 +1,13 @@
-﻿using Microsoft.AspNetCore.Authentication.Negotiate;
-using Proyecto_A1;
-using DataAccess.Models;
-using Servicios;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
+﻿using DataAccess.Models;
 using Logica_Negocio.Services.Interfaces;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Proyecto_A1;
+using Servicios;
+using Servicios.Interfaces;
+using System.Text;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -103,6 +104,13 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IBitacoraService, BitacoraService>();
+
+builder.Services.AddDbContext<CoreBancarioContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("CoreBancarioConnection")));
+
+builder.Services.AddScoped<ICoreBancarioService, CoreBancarioService>();
+
+builder.Services.AddScoped<ICoreBancarioService, CoreBancarioService>();
 
 var app = builder.Build();
 
