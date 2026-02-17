@@ -60,14 +60,12 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddHttpClient();
 
 // Registrar DbContexts
-builder.Services.AddDbContext<CoreBancarioContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("CoreBancarioConnection")));
-
 builder.Services.AddDbContext<PagosMovilesContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("PagosMovilesConnection")));
 
-// Registrar repositorios - CORREGIDO: TransaccionRepository (no TrnsaccionRepository)
+// Registrar repositorios
 builder.Services.AddScoped<TransaccionRepository>();
+builder.Services.AddScoped<AfiliacionRepository>();  // 👈 NUEVO: Para consultar teléfonos
 
 // Registrar servicios
 builder.Services.AddScoped<ReporteService>();
@@ -84,12 +82,13 @@ app.UseSwaggerUI(c =>
 
 app.UseHttpsRedirection();
 
-// SRV7 - RECIBIR TRANSACCIONES (PÚBLICO) 
+//  SRV7 - RECIBIR TRANSACCIONES (PÚBLICO) 
 app.MapPost("/transactions/process", async (
     HttpContext httpContext,
     [FromBody] TransaccionRequest request,
     IHttpClientFactory httpClientFactory,
-    IConfiguration config) =>
+    IConfiguration config,
+    [FromServices] AfiliacionRepository afiliacionRepo) =>  // 👈 NUEVO
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
@@ -183,8 +182,9 @@ app.MapPost("/transactions/process", async (
         });
     }
 
-    // Validar entidad origen (simulado)
-    if (request.EntidadOrigen != 1)
+    // Verificar que la entidad origen existe en la BD
+    var entidadOrigen = await afiliacionRepo.ObtenerEntidadPorIdAsync(request.EntidadOrigen);
+    if (entidadOrigen == null)
     {
         return Results.BadRequest(new TransaccionResponse
         {
@@ -196,7 +196,7 @@ app.MapPost("/transactions/process", async (
     try
     {
         // Llamar a SRV12 para enrutar
-        var routingServiceUrl = config["Services:RoutingService"] ?? "https://localhost:7001";
+        var routingServiceUrl = config["Services:RoutingService"] ?? "http://localhost:5104";
         logger.LogInformation("SRV7 - Llamando a SRV12: {Url}/transactions/route", routingServiceUrl);
 
         var httpClient = httpClientFactory.CreateClient();
@@ -219,7 +219,6 @@ app.MapPost("/transactions/process", async (
             if (result != null && result.Codigo == 0)
             {
                 logger.LogInformation("SRV7 - Transacción procesada exitosamente");
-
                 return Results.Ok(new TransaccionResponse
                 {
                     Codigo = 0,
@@ -269,7 +268,8 @@ app.MapPost("/transactions/send", async (
     [FromBody] EnvioTransaccionRequest request,
     HttpContext httpContext,
     IHttpClientFactory httpClientFactory,
-    IConfiguration config) =>
+    IConfiguration config,
+    [FromServices] AfiliacionRepository afiliacionRepo) =>  // 👈 NUEVO
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
@@ -292,9 +292,8 @@ app.MapPost("/transactions/send", async (
         return Results.Unauthorized();
     }
 
-    // Validar token (simulado)
-    var tokenValido = await ValidarTokenAsync(token, httpClientFactory, config, logger);
-    if (!tokenValido)
+    // Validar token (simulado - hasta implementar SRV5)
+    if (token.Length <= 10)
     {
         logger.LogWarning("SRV8 - Token inválido");
         return Results.Unauthorized();
@@ -335,8 +334,10 @@ app.MapPost("/transactions/send", async (
         });
     }
 
-    // Validar teléfono origen (debe existir en BD - simulado)
-    if (!TelefonoExisteEnBD(request.TelefonoOrigen))
+ 
+    // Validar que el teléfono origen existe en la BD
+    var afiliacion = await afiliacionRepo.ObtenerPorTelefonoAsync(request.TelefonoOrigen);
+    if (afiliacion == null)
     {
         return Results.BadRequest(new TransaccionResponse
         {
@@ -393,7 +394,7 @@ app.MapPost("/transactions/send", async (
             Descripcion = request.Descripcion
         };
 
-        // Simular llamada
+        // Simular llamada (en producción sería una llamada HTTP real)
         await Task.Delay(500);
 
         // Simular respuesta (80% éxito)
@@ -443,12 +444,13 @@ app.MapPost("/transactions/send", async (
 .Produces(StatusCodes.Status500InternalServerError);
 
 
-//  SRV12 - RUTEAR TRANSACCIONES 
+// SRV12 - RUTEAR TRANSACCIONES 
 app.MapPost("/transactions/route", async (
     [FromBody] RuteoTransaccionRequest request,
     HttpContext httpContext,
     IHttpClientFactory httpClientFactory,
-    IConfiguration config) =>
+    IConfiguration config,
+    [FromServices] AfiliacionRepository afiliacionRepo) =>  // 👈 NUEVO
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
@@ -468,7 +470,7 @@ app.MapPost("/transactions/route", async (
         return Results.Unauthorized();
     }
 
-    if (!await ValidarTokenAsync(token, httpClientFactory, config, logger))
+    if (token.Length <= 10)
     {
         logger.LogWarning("SRV12 - Token inválido");
         return Results.Unauthorized();
@@ -534,8 +536,9 @@ app.MapPost("/transactions/route", async (
     }
     #endregion
 
-    #region PASO 3: Validar que teléfono origen existe
-    if (!TelefonoExisteEnBD(request.TelefonoOrigen))
+    #region PASO 3: Validar que teléfono origen existe (CONSULTA REAL BD)
+    var afiliacionOrigen = await afiliacionRepo.ObtenerPorTelefonoAsync(request.TelefonoOrigen);
+    if (afiliacionOrigen == null)
     {
         logger.LogWarning("SRV12 - Teléfono origen no asociado: {Telefono}", request.TelefonoOrigen);
         return Results.BadRequest(new TransaccionResponse
@@ -546,13 +549,17 @@ app.MapPost("/transactions/route", async (
     }
     #endregion
 
-    #region PASO 4: Determinar si destino es interno o externo
-    var destinoEsInterno = TelefonoExisteEnBD(request.TelefonoDestino);
+    #region PASO 4: Determinar si destino es interno o externo (CONSULTA REAL BD)
+    var afiliacionDestino = await afiliacionRepo.ObtenerPorTelefonoAsync(request.TelefonoDestino);
+    var destinoEsInterno = afiliacionDestino != null;
 
     if (destinoEsInterno)
     {
         // FLUJO INTERNO
         logger.LogInformation("SRV12 - Destino interno, procesando...");
+        logger.LogInformation("Cliente destino: {Identificacion}, Cuenta: {Cuenta}",
+            afiliacionDestino.IdentificacionUsuario, afiliacionDestino.NumeroCuenta);
+
         await Task.Delay(300);
 
         var random = new Random().Next(1, 101);
@@ -581,7 +588,7 @@ app.MapPost("/transactions/route", async (
 
         try
         {
-            var srv8Url = config["Services:RoutingService"] ?? "https://localhost:7001";
+            var srv8Url = config["Services:RoutingService"] ?? "http://localhost:5104";
             var httpClient = httpClientFactory.CreateClient();
 
             var externalRequest = new
@@ -699,29 +706,7 @@ app.MapGet("/health", () => Results.Ok(new
 
 app.Run();
 
-// MÉTODOS DE AYUDA  
-
-async Task<bool> ValidarTokenAsync(string token, IHttpClientFactory httpClientFactory, IConfiguration config, ILogger logger)
-{
-    try
-    {
-        await Task.Delay(50);
-        return !string.IsNullOrEmpty(token) && token.Length > 10;
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Error validando token");
-        return false;
-    }
-}
-
-bool TelefonoExisteEnBD(string telefono)
-{
-    var telefonosValidos = new[] { "88881111", "88882222", "88883333", "88884444" };
-    return telefonosValidos.Contains(telefono);
-}
-
-// DTos para requests y responses
+// DTOs 
 public class EnvioTransaccionRequest
 {
     public int EntidadOrigen { get; set; }
