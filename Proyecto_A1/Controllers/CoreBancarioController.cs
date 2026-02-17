@@ -1,7 +1,6 @@
 ﻿using Logica_Negocio.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Servicios;
 using Servicios.DTOs;
 using Servicios.Interfaces;
 using System.Security.Claims;
@@ -202,7 +201,7 @@ namespace Proyecto_A1.Controllers
             }
         }
 
-        // SRV14: Aplicar transacción individual
+        // SRV14: Aplicar transacción individual (débito/crédito)
         [HttpPost("transaccion")]
         public async Task<IActionResult> AplicarTransaccion([FromBody] TransaccionRequestDto request)
         {
@@ -284,184 +283,6 @@ namespace Proyecto_A1.Controllers
                     resultado: "ERROR",
                     descripcion: $"Error: {ex.Message}",
                     servicio: "CoreBancarioController.AplicarTransaccion"
-                );
-
-                return StatusCode(500, new CoreResponseDto
-                {
-                    Codigo = -1,
-                    Descripcion = "Error interno del servidor"
-                });
-            }
-        }
-
-        //Transferencia entre cuentas (con registro en Transaccion_Envio)
-        [HttpPost("transferir")]
-        public async Task<IActionResult> Transferir([FromBody] TransferenciaRequestDto request)
-        {
-            try
-            {
-                if (request == null)
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Datos de transferencia requeridos"
-                    });
-                }
-
-                // Validaciones de origen
-                if (string.IsNullOrWhiteSpace(request.IdentificacionOrigen))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Identificación de origen requerida"
-                    });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.CuentaOrigen))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Cuenta de origen requerida"
-                    });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.TelefonoOrigen))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Teléfono de origen requerido"
-                    });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.NombreOrigen))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Nombre de origen requerido"
-                    });
-                }
-
-                if (request.EntidadOrigenId <= 0)
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "ID de entidad origen inválido"
-                    });
-                }
-
-                // Validaciones de destino
-                if (string.IsNullOrWhiteSpace(request.IdentificacionDestino))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Identificación de destino requerida"
-                    });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.CuentaDestino))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Cuenta de destino requerida"
-                    });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.TelefonoDestino))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Teléfono de destino requerido"
-                    });
-                }
-
-                if (request.EntidadDestinoId <= 0)
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "ID de entidad destino inválido"
-                    });
-                }
-
-                // Validación de monto
-                if (request.Monto <= 0)
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Monto debe ser mayor a cero"
-                    });
-                }
-
-                // No permitir transferencia a la misma cuenta
-                if (request.CuentaOrigen == request.CuentaDestino &&
-                    request.IdentificacionOrigen == request.IdentificacionDestino)
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "No se puede transferir a la misma cuenta"
-                    });
-                }
-
-                // Procesar transferencia
-                var (exito, mensaje, saldoOrigenNuevo, saldoDestinoNuevo) = await _coreService.TransferirAsync(
-                    identificacionOrigen: request.IdentificacionOrigen,
-                    cuentaOrigen: request.CuentaOrigen,
-                    identificacionDestino: request.IdentificacionDestino,
-                    cuentaDestino: request.CuentaDestino,
-                    monto: request.Monto,
-                    entidadOrigenId: request.EntidadOrigenId,
-                    entidadDestinoId: request.EntidadDestinoId,
-                    telefonoOrigen: request.TelefonoOrigen,
-                    nombreOrigen: request.NombreOrigen,
-                    telefonoDestino: request.TelefonoDestino,
-                    referenciaExterna: request.ReferenciaExterna,
-                    descripcion: request.Descripcion
-                );
-
-                if (!exito)
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = mensaje
-                    });
-                }
-
-                await _bitacoraService.RegistrarAccionBitacora(
-                    usuario: ObtenerUsuarioActual(),
-                    accion: "TRANSFERENCIA",
-                    resultado: "EXITO",
-                    descripcion: $"Transferencia de {request.Monto:C} de {request.CuentaOrigen} a {request.CuentaDestino}",
-                    servicio: "CoreBancarioController.Transferir"
-                );
-
-                return Ok(new TransferenciaResponseDto
-                {
-                    Codigo = 0,
-                    Descripcion = mensaje,
-                    SaldoOrigenNuevo = saldoOrigenNuevo,
-                    SaldoDestinoNuevo = saldoDestinoNuevo
-                });
-            }
-            catch (Exception ex)
-            {
-                await _bitacoraService.RegistrarAccionBitacora(
-                    usuario: ObtenerUsuarioActual(),
-                    accion: "TRANSFERENCIA",
-                    resultado: "ERROR",
-                    descripcion: $"Error: {ex.Message}",
-                    servicio: "CoreBancarioController.Transferir"
                 );
 
                 return StatusCode(500, new CoreResponseDto

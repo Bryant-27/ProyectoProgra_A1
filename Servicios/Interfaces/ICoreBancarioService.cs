@@ -13,26 +13,11 @@ namespace Servicios.Interfaces
         // SRV16: Obtener últimos 5 movimientos
         Task<List<MovimientoCuenta>> ObtenerUltimosMovimientosAsync(string identificacion, string numeroCuenta);
 
-        // SRV14: Aplicar transacción individual
+        // SRV14: Aplicar transacción individual (débito/crédito)
         Task<(bool exito, string mensaje, decimal? nuevoSaldo)> AplicarTransaccionAsync(
             string identificacion,
             string tipoMovimiento,
             decimal monto,
-            string? referenciaExterna = null,
-            string? descripcion = null);
-
-        // Transferencia entre cuentas (con datos de teléfono para Transaccion_Envio)
-        Task<(bool exito, string mensaje, decimal? saldoOrigenNuevo, decimal? saldoDestinoNuevo)> TransferirAsync(
-            string identificacionOrigen,
-            string cuentaOrigen,
-            string identificacionDestino,
-            string cuentaDestino,
-            decimal monto,
-            int entidadOrigenId,
-            int entidadDestinoId,
-            string telefonoOrigen,
-            string nombreOrigen,
-            string telefonoDestino,
             string? referenciaExterna = null,
             string? descripcion = null);
     }

@@ -48,7 +48,7 @@ namespace Servicios.DTOs
         public List<MovimientoDto> Movimientos { get; set; } = new();
     }
 
-    // DTO para solicitud de transacción individual
+    // DTO para solicitud de transacción (solo SRV14)
     public class TransaccionRequestDto
     {
         [JsonPropertyName("identificacion")]
@@ -65,58 +65,5 @@ namespace Servicios.DTOs
 
         [JsonPropertyName("descripcion")]
         public string? Descripcion { get; set; }
-    }
-
-    // DTO para solicitud de transferencia entre cuentas
-    public class TransferenciaRequestDto
-    {
-        // Origen
-        [JsonPropertyName("identificacionOrigen")]
-        public string IdentificacionOrigen { get; set; } = string.Empty;
-
-        [JsonPropertyName("cuentaOrigen")]
-        public string CuentaOrigen { get; set; } = string.Empty;
-
-        [JsonPropertyName("telefonoOrigen")]
-        public string TelefonoOrigen { get; set; } = string.Empty;
-
-        [JsonPropertyName("nombreOrigen")]
-        public string NombreOrigen { get; set; } = string.Empty;
-
-        [JsonPropertyName("entidadOrigenId")]
-        public int EntidadOrigenId { get; set; }  // NUEVO
-
-        // Destino
-        [JsonPropertyName("identificacionDestino")]
-        public string IdentificacionDestino { get; set; } = string.Empty;
-
-        [JsonPropertyName("cuentaDestino")]
-        public string CuentaDestino { get; set; } = string.Empty;
-
-        [JsonPropertyName("telefonoDestino")]
-        public string TelefonoDestino { get; set; } = string.Empty;
-
-        [JsonPropertyName("entidadDestinoId")]
-        public int EntidadDestinoId { get; set; }  // NUEVO
-
-        // Transferencia
-        [JsonPropertyName("monto")]
-        public decimal Monto { get; set; }
-
-        [JsonPropertyName("referenciaExterna")]
-        public string? ReferenciaExterna { get; set; }
-
-        [JsonPropertyName("descripcion")]
-        public string? Descripcion { get; set; }
-    }
-
-    // DTO para respuesta de transferencia
-    public class TransferenciaResponseDto : CoreResponseDto
-    {
-        [JsonPropertyName("saldoOrigenNuevo")]
-        public decimal? SaldoOrigenNuevo { get; set; }
-
-        [JsonPropertyName("saldoDestinoNuevo")]
-        public decimal? SaldoDestinoNuevo { get; set; }
     }
 }

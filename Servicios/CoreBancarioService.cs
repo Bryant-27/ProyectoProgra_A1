@@ -9,16 +9,13 @@ namespace Servicios
     {
         private readonly CoreBancarioContext _context;
         private readonly IBitacoraService _bitacoraService;
-        private readonly ITransaccionEnvioService _transaccionEnvioService;
 
         public CoreBancarioService(
             CoreBancarioContext context,
-            IBitacoraService bitacoraService,
-            ITransaccionEnvioService transaccionEnvioService)
+            IBitacoraService bitacoraService)
         {
             _context = context;
             _bitacoraService = bitacoraService;
-            _transaccionEnvioService = transaccionEnvioService;
         }
 
         // SRV19: Verificar si un cliente existe
@@ -138,7 +135,7 @@ namespace Servicios
             }
         }
 
-        // SRV14: Aplicar transacción individual
+        // SRV14: Aplicar transacción individual (débito o crédito)
         public async Task<(bool exito, string mensaje, decimal? nuevoSaldo)> AplicarTransaccionAsync(
             string identificacion,
             string tipoMovimiento,
@@ -148,11 +145,19 @@ namespace Servicios
         {
             try
             {
+                // Validar monto
                 if (monto <= 0)
                 {
                     return (false, "El monto debe ser mayor a cero", null);
                 }
 
+                // Validar tipo de movimiento
+                if (string.IsNullOrWhiteSpace(tipoMovimiento))
+                {
+                    return (false, "Tipo de movimiento requerido (CREDITO/DEBITO)", null);
+                }
+
+                // Buscar cliente y su cuenta activa
                 var cliente = await _context.ClientesBanco
                     .Include(c => c.Cuentas.Where(cu => cu.IdEstado == 1))
                     .FirstOrDefaultAsync(c => c.Identificacion == identificacion && c.IdEstado == 1);
@@ -168,6 +173,7 @@ namespace Servicios
                     return (false, "Cliente no tiene cuentas activas", null);
                 }
 
+                // Iniciar transacción
                 using var transaction = await _context.Database.BeginTransactionAsync();
 
                 try
@@ -175,8 +181,10 @@ namespace Servicios
                     decimal saldoAnterior = cuenta.Saldo;
                     decimal saldoNuevo;
 
+                    // Procesar según tipo de movimiento
                     if (tipoMovimiento.Equals("DEBITO", StringComparison.OrdinalIgnoreCase))
                     {
+                        // Validar saldo suficiente para débito
                         if (cuenta.Saldo < monto)
                         {
                             await transaction.RollbackAsync();
@@ -194,8 +202,10 @@ namespace Servicios
                         return (false, "Tipo de movimiento inválido. Use CREDITO o DEBITO", null);
                     }
 
+                    // Actualizar saldo
                     cuenta.Saldo = saldoNuevo;
 
+                    // Registrar movimiento
                     var movimiento = new MovimientoCuenta
                     {
                         NumeroCuenta = cuenta.NumeroCuenta,
@@ -211,8 +221,10 @@ namespace Servicios
                     _context.MovimientosCuenta.Add(movimiento);
                     await _context.SaveChangesAsync();
 
+                    // Commit
                     await transaction.CommitAsync();
 
+                    // Bitácora
                     await _bitacoraService.RegistrarAccionBitacora(
                         usuario: "Sistema",
                         accion: "TRANSACCION",
@@ -237,152 +249,6 @@ namespace Servicios
                     resultado: "ERROR",
                     descripcion: $"Error al aplicar transacción: {ex.Message}",
                     servicio: "CoreBancarioService.AplicarTransaccionAsync"
-                );
-                throw;
-            }
-        }
-
-        // Transferencia entre cuentas
-        public async Task<(bool exito, string mensaje, decimal? saldoOrigenNuevo, decimal? saldoDestinoNuevo)> TransferirAsync(
-        string identificacionOrigen,
-        string cuentaOrigen,
-        string identificacionDestino,
-        string cuentaDestino,
-        decimal monto,
-        int entidadOrigenId,
-        int entidadDestinoId,
-        string telefonoOrigen,
-        string nombreOrigen,
-        string telefonoDestino,
-        string? referenciaExterna = null,
-        string? descripcion = null)
-        {
-            try
-            {
-                if (monto <= 0)
-                {
-                    return (false, "El monto debe ser mayor a cero", null, null);
-                }
-
-                var origen = await _context.Cuentas
-                    .Include(c => c.Cliente)
-                    .FirstOrDefaultAsync(c => c.NumeroCuenta == cuentaOrigen
-                        && c.Cliente != null
-                        && c.Cliente.Identificacion == identificacionOrigen
-                        && c.IdEstado == 1);
-
-                if (origen == null)
-                {
-                    return (false, "Cuenta origen no encontrada o no está activa", null, null);
-                }
-
-                var destino = await _context.Cuentas
-                    .Include(c => c.Cliente)
-                    .FirstOrDefaultAsync(c => c.NumeroCuenta == cuentaDestino
-                        && c.Cliente != null
-                        && c.Cliente.Identificacion == identificacionDestino
-                        && c.IdEstado == 1);
-
-                if (destino == null)
-                {
-                    return (false, "Cuenta destino no encontrada o no está activa", null, null);
-                }
-
-                if (origen.Saldo < monto)
-                {
-                    return (false, "Saldo insuficiente en cuenta origen", origen.Saldo, null);
-                }
-
-                using var transaction = await _context.Database.BeginTransactionAsync();
-
-                try
-                {
-                    decimal saldoOrigenAnterior = origen.Saldo;
-                    decimal saldoDestinoAnterior = destino.Saldo;
-
-                    origen.Saldo -= monto;
-                    destino.Saldo += monto;
-
-                    var movimientoOrigen = new MovimientoCuenta
-                    {
-                        NumeroCuenta = origen.NumeroCuenta,
-                        Monto = monto,
-                        TipoMovimiento = "DEBITO",
-                        Descripcion = descripcion ?? $"Transferencia a cuenta {cuentaDestino}",
-                        SaldoAnterior = saldoOrigenAnterior,
-                        SaldoNuevo = origen.Saldo,
-                        ReferenciaExterna = referenciaExterna,
-                        FechaMovimiento = DateTime.Now
-                    };
-
-                    var movimientoDestino = new MovimientoCuenta
-                    {
-                        NumeroCuenta = destino.NumeroCuenta,
-                        Monto = monto,
-                        TipoMovimiento = "CREDITO",
-                        Descripcion = descripcion ?? $"Transferencia desde cuenta {cuentaOrigen}",
-                        SaldoAnterior = saldoDestinoAnterior,
-                        SaldoNuevo = destino.Saldo,
-                        ReferenciaExterna = referenciaExterna,
-                        FechaMovimiento = DateTime.Now
-                    };
-
-                    _context.MovimientosCuenta.AddRange(movimientoOrigen, movimientoDestino);
-                    await _context.SaveChangesAsync();
-
-                    await transaction.CommitAsync();
-
-                    // Registrar en Transaccion_Envio con los datos correctos
-                    try
-                    {
-                        await _transaccionEnvioService.RegistrarTransferenciaAsync(
-                            entidadOrigenId: entidadOrigenId,
-                            entidadDestinoId: entidadDestinoId,
-                            telefonoOrigen: telefonoOrigen,
-                            nombreOrigen: nombreOrigen,
-                            telefonoDestino: telefonoDestino,
-                            monto: monto,
-                            descripcion: descripcion ?? "Transferencia",
-                            codigoRespuesta: 200,  // Código HTTP de éxito
-                            mensajeRespuesta: "Transferencia exitosa"
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        // Solo bitácora, no afectamos la respuesta al cliente
-                        await _bitacoraService.RegistrarAccionBitacora(
-                            usuario: "Sistema",
-                            accion: "TRANSACCION_ENVIO",
-                            resultado: "ERROR",
-                            descripcion: $"Error registrando en Transaccion_Envio: {ex.Message}",
-                            servicio: "CoreBancarioService.TransferirAsync"
-                        );
-                    }
-
-                    await _bitacoraService.RegistrarAccionBitacora(
-                        usuario: "Sistema",
-                        accion: "TRANSFERENCIA",
-                        resultado: "EXITO",
-                        descripcion: $"Transferencia de {monto:C} desde {cuentaOrigen} hacia {cuentaDestino}. Ref: {referenciaExterna}",
-                        servicio: "CoreBancarioService.TransferirAsync"
-                    );
-
-                    return (true, "Transferencia realizada exitosamente", origen.Saldo, destino.Saldo);
-                }
-                catch (Exception)
-                {
-                    await transaction.RollbackAsync();
-                    throw;
-                }
-            }
-            catch (Exception ex)
-            {
-                await _bitacoraService.RegistrarAccionBitacora(
-                    usuario: "Sistema",
-                    accion: "TRANSFERENCIA",
-                    resultado: "ERROR",
-                    descripcion: $"Error al realizar transferencia: {ex.Message}",
-                    servicio: "CoreBancarioService.TransferirAsync"
                 );
                 throw;
             }
