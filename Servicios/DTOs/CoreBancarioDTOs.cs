@@ -48,7 +48,7 @@ namespace Servicios.DTOs
         public List<MovimientoDto> Movimientos { get; set; } = new();
     }
 
-    // DTO para solicitud de transacción (solo SRV14)
+    // DTO para solicitud de transacción (SRV14)
     public class TransaccionRequestDto
     {
         [JsonPropertyName("identificacion")]

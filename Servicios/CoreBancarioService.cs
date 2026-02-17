@@ -135,7 +135,7 @@ namespace Servicios
             }
         }
 
-        // SRV14: Aplicar transacción individual (débito o crédito)
+        // SRV14: Aplicar transacción
         public async Task<(bool exito, string mensaje, decimal? nuevoSaldo)> AplicarTransaccionAsync(
             string identificacion,
             string tipoMovimiento,
@@ -149,12 +149,6 @@ namespace Servicios
                 if (monto <= 0)
                 {
                     return (false, "El monto debe ser mayor a cero", null);
-                }
-
-                // Validar tipo de movimiento
-                if (string.IsNullOrWhiteSpace(tipoMovimiento))
-                {
-                    return (false, "Tipo de movimiento requerido (CREDITO/DEBITO)", null);
                 }
 
                 // Buscar cliente y su cuenta activa

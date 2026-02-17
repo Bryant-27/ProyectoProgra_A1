@@ -29,7 +29,7 @@ namespace Proyecto_A1.Controllers
         }
 
         // SRV19: Verificar si un cliente existe
-        [HttpGet("cliente-existe")]
+        [HttpGet("client-exists")]
         public async Task<IActionResult> ClienteExiste([FromQuery] string identificacion)
         {
             try
@@ -79,7 +79,7 @@ namespace Proyecto_A1.Controllers
         }
 
         // SRV15: Consultar saldo
-        [HttpGet("saldo")]
+        [HttpGet("balance")]
         public async Task<IActionResult> ConsultarSaldo(
             [FromQuery] string identificacion,
             [FromQuery] string cuenta)
@@ -140,7 +140,7 @@ namespace Proyecto_A1.Controllers
         }
 
         // SRV16: Obtener últimos movimientos
-        [HttpGet("movimientos")]
+        [HttpGet("transactions")]
         public async Task<IActionResult> ObtenerMovimientos(
             [FromQuery] string identificacion,
             [FromQuery] string cuenta)
@@ -201,8 +201,8 @@ namespace Proyecto_A1.Controllers
             }
         }
 
-        // SRV14: Aplicar transacción individual (débito/crédito)
-        [HttpPost("transaccion")]
+        // SRV14: Aplicar transacción
+        [HttpPost("transaction")]
         public async Task<IActionResult> AplicarTransaccion([FromBody] TransaccionRequestDto request)
         {
             try
