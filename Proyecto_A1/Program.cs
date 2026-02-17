@@ -3,6 +3,9 @@ using Proyecto_A1;
 using DataAccess.Models;
 using Servicios;
 using Microsoft.EntityFrameworkCore;
+using DataAccess.Repositories;
+using Logica_Negocio.Services;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
