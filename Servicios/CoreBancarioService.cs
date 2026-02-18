@@ -323,7 +323,7 @@ namespace Servicios
                     await _bitacoraService.RegistrarAccionBitacora(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
-                        resultado: "ERROR_CORE",  // Valor corto
+                        resultado: "ERROR_CORE",  
                         descripcion: $"Error core para cuenta {cuenta}",
                         servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                     );
@@ -334,7 +334,7 @@ namespace Servicios
                 await _bitacoraService.RegistrarAccionBitacora(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO_TELEFONO",
-                    resultado: "EXITO",  // Valor corto
+                    resultado: "EXITO",  
                     descripcion: $"Saldo telf {telefono}: {saldo:C}",
                     servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                 );
@@ -346,7 +346,7 @@ namespace Servicios
                 await _bitacoraService.RegistrarAccionBitacora(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO_TELEFONO",
-                    resultado: "ERROR",  // Valor corto
+                    resultado: "ERROR",  
                     descripcion: $"Error: {ex.Message}",
                     servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                 );
