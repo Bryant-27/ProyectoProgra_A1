@@ -109,10 +109,10 @@ public static class RolesEndpoints
         // ===== METODOS POST =====
 
         group.MapPost("/", async (
-            [FromBody] Roles roles,
+            //[FromBody] Roles roles,
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora,
-            [FromServices] RolDTO rol) =>
+            [FromBody] RolDTO rol) =>
         {
 
             if (rol.Pantallas == null || !rol.Pantallas.Any())
@@ -147,7 +147,7 @@ public static class RolesEndpoints
             }
 
             await db.SaveChangesAsync();
-            return TypedResults.Created($"/api/Roles/{roles.IdRol}",NewRol);
+            return TypedResults.Created($"/api/Roles/{rol.ID}",NewRol);
         })
         .WithName("CreateRoles")
         .WithOpenApi();
