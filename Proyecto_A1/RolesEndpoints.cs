@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Logica_Negocio.Services.Interfaces;
 using Entities;
+using Azure.Core;
 
 namespace Proyecto_A1;
 
@@ -50,10 +51,11 @@ public static class RolesEndpoints
         group.MapGet("/{id}", async Task<Results<Ok<Roles>, NotFound>> (
             int idrol, 
             [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+            [FromServices] IBitacoraService bitacora,
+            HttpContext context) =>
         {
 
-            var usuario = "Usuario desconocido"; // Aquí podrías obtener el usuario autenticado desde el contexto
+            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido"; // Aquí podrías obtener el usuario autenticado desde el contexto
             var rol = await db.Roles
                .AsNoTracking()
                .FirstOrDefaultAsync(model => model.IdRol== idrol);
@@ -92,8 +94,6 @@ public static class RolesEndpoints
             [FromServices] IBitacoraService bitacora) =>
         {
 
-
-
             var affected = await db.Roles
                 .Where(model => model.IdRol == idrol)
                 .ExecuteUpdateAsync(setters => setters
@@ -109,11 +109,13 @@ public static class RolesEndpoints
         // ===== METODOS POST =====
 
         group.MapPost("/", async (
-            //[FromBody] Roles roles,
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora,
-            [FromBody] RolDTO rol) =>
+            [FromBody] RolDTO rol,
+            HttpContext context) =>
         {
+
+            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
             if (rol.Pantallas == null || !rol.Pantallas.Any())
                 return Results.BadRequest("El rol debe tener al menos una pantalla asignada.");
@@ -128,10 +130,9 @@ public static class RolesEndpoints
 
             var NewRol = new Roles
             {
-                IdRol = rol.ID,
+                IdRol = rol.IdRol,
                 Nombre = rol.Nombre,
-                Descripcion = rol.Descripcion,
-
+                Descripcion = rol.Descripcion
             };
 
             db.Roles.Add(NewRol);
@@ -147,7 +148,23 @@ public static class RolesEndpoints
             }
 
             await db.SaveChangesAsync();
-            return TypedResults.Created($"/api/Roles/{rol.ID}",NewRol);
+
+            var respuesta = new RolDTO
+            {
+                IdRol = NewRol.IdRol,
+                Nombre = NewRol.Nombre,
+                Descripcion = NewRol.Descripcion,
+                Pantallas = rol.Pantallas
+            };
+
+            await bitacora.RegistrarAccionBitacora(
+               usuario, 
+               "Crear nuevo rol",
+               "Éxito",
+               $"Se creó un nuevo rol con ID {NewRol.IdRol}."
+           );
+
+            return TypedResults.Created($"/api/Roles/{rol.IdRol}",respuesta);
         })
         .WithName("CreateRoles")
         .WithOpenApi();

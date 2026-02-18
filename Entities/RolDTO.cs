@@ -8,9 +8,9 @@ namespace Entities
 {
     public class RolDTO
     {
-        public int ID { get; set; } 
+        public int IdRol { get; set; }
         public string Nombre { get; set; } = null!;
         public string? Descripcion { get; set; }
-        public List<int> Pantallas { get; set; } = new List<int>();
+        public List<int> Pantallas { get; set; } = new();
     }
 }
