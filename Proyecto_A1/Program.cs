@@ -65,10 +65,12 @@ builder.Services.AddDbContext<PagosMovilesContext>(options =>
 
 // Registrar repositorios
 builder.Services.AddScoped<TransaccionRepository>();
-builder.Services.AddScoped<AfiliacionRepository>();  // 👈 NUEVO: Para consultar teléfonos
+builder.Services.AddScoped<AfiliacionRepository>();
+//builder.Services.AddScoped<BitacoraRepository>();
 
 // Registrar servicios
 builder.Services.AddScoped<ReporteService>();
+//builder.Services.AddScoped<BitacoraService>();
 
 var app = builder.Build();
 

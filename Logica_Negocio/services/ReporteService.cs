@@ -13,18 +13,20 @@ namespace Logica_Negocio.Services
     {
         private readonly ILogger<ReporteService> _logger;
         private readonly TransaccionRepository _transaccionRepository;
+        //private readonly BitacoraService _bitacoraService;
 
         public ReporteService(
             ILogger<ReporteService> logger,
             TransaccionRepository transaccionRepository)
+            //BitacoraService bitacoraService)      
+
         {
             _logger = logger;
             _transaccionRepository = transaccionRepository;
+
         }
 
-        /// <summary>
-        /// Genera reporte de transacciones diarias (SRV17)
-        /// </summary>
+        /// Genera reporte de transacciones diarias (SRV17)   
         public async Task<ReporteDiarioResponse> GenerarReporteDiarioAsync(ReporteDiarioRequest request, string token)
         {
             try
