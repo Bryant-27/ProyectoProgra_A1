@@ -126,8 +126,16 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
 app.MapUsuariosEndpoints();
+
 app.MapTablaPantallasEndpoints();
+
+app.MapRolesEndpoints();
+
+app.MapParametrosEndpoints();
+
+app.MapEntidadesEndpoints();
 
 app.Run();
 
