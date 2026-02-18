@@ -15,7 +15,7 @@ public partial class Usuarios
     public string NombreCompleto { get; set; } = null!;
 
     [Column("Tipo_Identificacion")]
-    public int TipoIdentificacion { get; set; }
+    public string TipoIdentificacion { get; set; } = null!;
 
     public string Identificacion { get; set; } = null!;
 
@@ -45,6 +45,5 @@ public partial class Usuarios
 
     public virtual ICollection<InicioSesion> InicioSesion { get; set; } = new List<InicioSesion>();
 
-    [ForeignKey("TipoIdentificacion")]
     public virtual TiposIdentificacion TipoIdentificacionNavigation { get; set; } = null!;
 }

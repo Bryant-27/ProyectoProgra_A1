@@ -284,8 +284,15 @@ public partial class PagosMovilesContext : DbContext
                 .HasColumnName("Nombre_Completo");
             entity.Property(e => e.Telefono).HasMaxLength(20);
             entity.Property(e => e.TipoIdentificacion)
-                .HasMaxLength(20)
-                .HasColumnName("Tipo_Identificacion");
+            .HasMaxLength(20)
+            .HasColumnName("Tipo_Identificacion");
+
+            entity.HasOne(u => u.TipoIdentificacionNavigation)
+          .WithMany(t => t.Usuarios)
+          .HasPrincipalKey(t => t.TipoIdentificacion)   // columna varchar en tabla principal
+          .HasForeignKey(u => u.TipoIdentificacion)     // columna varchar en Usuarios
+          .HasConstraintName("FK_Usuarios_TipoIdent");
+
             entity.Property(e => e.Usuario).HasMaxLength(100);
 
             entity.HasOne(d => d.IdEstadoNavigation).WithMany(p => p.Usuarios)
@@ -297,12 +304,6 @@ public partial class PagosMovilesContext : DbContext
                 .HasForeignKey(d => d.IdRol)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Usuarios_Roles");
-
-            entity.HasOne(d => d.TipoIdentificacionNavigation).WithMany(p => p.Usuarios)
-                .HasPrincipalKey(p => p.TipoIdentificacion)
-                .HasForeignKey(d => d.TipoIdentificacion)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Usuarios_TipoIdent");
         });
 
         OnModelCreatingPartial(modelBuilder);

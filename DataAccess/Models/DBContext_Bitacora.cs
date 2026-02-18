@@ -22,16 +22,16 @@ namespace DataAccess.Models
     {
         [Key]
         public long BitacoraId { get; set; }
-        public string Usuario { get; set; }
-        public string Accion {  get; set; }
+        public string Usuario { get; set; } = null!;
+        public string Accion { get; set; } = null!;
 
-        public string Descripcion { get; set; }
+        public string Descripcion { get; set; } = null!;
 
         public DateTime FechaRegistro { get; set; }
 
-        public string Servicio { get; set; }
+        public string Servicio { get; set; } = null!;
 
-        public string Resultado { get; set; }
+        public string Resultado { get; set; } = null!;
 
 
     }
