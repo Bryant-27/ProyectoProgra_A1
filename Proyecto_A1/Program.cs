@@ -80,7 +80,7 @@ builder.Services.AddScoped<IAfiliacionRepository, AfiliacionRepository>();
 // SERVICIOS (SRV11)
 // =====================
 builder.Services.AddScoped<ServicioAutenticacion>();
-builder.Services.AddScoped<IBitacoraService, BitacoraService>();
+//builder.Services.AddScoped<IBitacoraService, BitacoraService>();
 builder.Services.AddScoped<IMovimientosService, MovimientosService>();
 
 // =====================

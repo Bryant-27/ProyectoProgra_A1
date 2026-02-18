@@ -40,9 +40,6 @@ namespace Logica_Negocio.Services.Interfaces
             await _bitacoraContext.SaveChangesAsync();
         }
 
-        //public Task RegistrarAccionBitacora(string usuario, string accion, string resultado, string descripcion = "", string servicio = "")
-        //{
-        //    throw new NotImplementedException();
-        //}
+
     }
 }
