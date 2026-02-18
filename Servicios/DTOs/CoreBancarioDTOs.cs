@@ -66,4 +66,14 @@ namespace Servicios.DTOs
         [JsonPropertyName("descripcion")]
         public string? Descripcion { get; set; }
     }
+
+    // DTO para consulta de saldo por teléfono (SRV13)
+    public class ConsultaSaldoTelefonoRequestDto
+    {
+        [JsonPropertyName("telefono")]
+        public string Telefono { get; set; } = string.Empty;
+
+        [JsonPropertyName("identificacion")]
+        public string Identificacion { get; set; } = string.Empty;
+    }
 }

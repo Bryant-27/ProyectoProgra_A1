@@ -7,7 +7,7 @@ namespace Servicios.Interfaces
         // SRV19: Verificar si un cliente existe
         Task<bool> ClienteExisteAsync(string identificacion);
 
-        // SRV15: Consultar saldo
+        // SRV15: Consultar saldo (por identificación + cuenta)
         Task<decimal?> ConsultarSaldoAsync(string identificacion, string numeroCuenta);
 
         // SRV16: Obtener últimos 5 movimientos
@@ -20,5 +20,10 @@ namespace Servicios.Interfaces
             decimal monto,
             string? referenciaExterna = null,
             string? descripcion = null);
+
+        // SRV13 - Consultar saldo por teléfono (usa afiliación + SRV15 internamente)
+        Task<(bool exito, string mensaje, decimal? saldo)> ConsultarSaldoPorTelefonoAsync(
+            string telefono,
+            string identificacion);
     }
 }

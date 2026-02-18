@@ -9,13 +9,16 @@ namespace Servicios
     {
         private readonly CoreBancarioContext _context;
         private readonly IBitacoraService _bitacoraService;
+        private readonly IAfiliacionService _afiliacionService;
 
         public CoreBancarioService(
             CoreBancarioContext context,
-            IBitacoraService bitacoraService)
+            IBitacoraService bitacoraService,
+            IAfiliacionService afiliacionService)
         {
             _context = context;
             _bitacoraService = bitacoraService;
+            _afiliacionService = afiliacionService;
         }
 
         // SRV19: Verificar si un cliente existe
@@ -245,6 +248,110 @@ namespace Servicios
                     servicio: "CoreBancarioService.AplicarTransaccionAsync"
                 );
                 throw;
+            }
+        }
+
+        // SRV13: Consultar saldo por teléfono
+        public async Task<(bool exito, string mensaje, decimal? saldo)> ConsultarSaldoPorTelefonoAsync(
+    string telefono,
+    string identificacion)
+        {
+            try
+            {
+                // Validar datos requeridos
+                if (string.IsNullOrWhiteSpace(telefono))
+                {
+                    return (false, "Debe enviar los datos completos y válidos", null);
+                }
+
+                if (string.IsNullOrWhiteSpace(identificacion))
+                {
+                    return (false, "Debe enviar los datos completos y válidos", null);
+                }
+
+                // PASO 1: Validar que el teléfono esté asociado a pagos móviles
+                var (existe, identificacionAfiliacion, nombre, cuenta) =
+                    await _afiliacionService.ObtenerInfoPorTelefonoAsync(telefono);
+
+                if (!existe)
+                {
+                    await _bitacoraService.RegistrarAccionBitacora(
+                        usuario: "Sistema",
+                        accion: "CONSULTA_SALDO_TELEFONO",
+                        resultado: "NO_AFILIADO",  // Valor corto
+                        descripcion: $"Teléfono {telefono} no está afiliado",
+                        servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
+                    );
+
+                    return (false, "Cliente no asociado a pagos móviles", null);
+                }
+
+                // PASO 2: Validar que la identificación coincida
+                if (identificacionAfiliacion != identificacion)
+                {
+                    await _bitacoraService.RegistrarAccionBitacora(
+                        usuario: "Sistema",
+                        accion: "CONSULTA_SALDO_TELEFONO",
+                        resultado: "ID_NO_COINCIDE",  // Valor corto
+                        descripcion: $"ID {identificacion} no coincide con telf {telefono}",
+                        servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
+                    );
+
+                    return (false, "Identificación no coincide con el teléfono", null);
+                }
+
+                // PASO 3: Verificar que tenemos número de cuenta
+                if (string.IsNullOrEmpty(cuenta))
+                {
+                    await _bitacoraService.RegistrarAccionBitacora(
+                        usuario: "Sistema",
+                        accion: "CONSULTA_SALDO_TELEFONO",
+                        resultado: "ERROR_CUENTA",  // Valor corto
+                        descripcion: $"Afiliación {telefono} sin cuenta",
+                        servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
+                    );
+
+                    return (false, "Error en configuración de afiliación", null);
+                }
+
+                // PASO 4: Usar SRV15 para consultar el saldo en el core
+                var saldo = await ConsultarSaldoAsync(identificacionAfiliacion, cuenta);
+
+                // PASO 5: Verificar resultado
+                if (saldo == null)
+                {
+                    await _bitacoraService.RegistrarAccionBitacora(
+                        usuario: "Sistema",
+                        accion: "CONSULTA_SALDO_TELEFONO",
+                        resultado: "ERROR_CORE",  // Valor corto
+                        descripcion: $"Error core para cuenta {cuenta}",
+                        servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
+                    );
+
+                    return (false, "Error al consultar saldo en el core bancario", null);
+                }
+
+                await _bitacoraService.RegistrarAccionBitacora(
+                    usuario: "Sistema",
+                    accion: "CONSULTA_SALDO_TELEFONO",
+                    resultado: "EXITO",  // Valor corto
+                    descripcion: $"Saldo telf {telefono}: {saldo:C}",
+                    servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
+                );
+
+                return (true, "Consulta exitosa", saldo);
+            }
+            catch (Exception ex)
+            {
+                await _bitacoraService.RegistrarAccionBitacora(
+                    usuario: "Sistema",
+                    accion: "CONSULTA_SALDO_TELEFONO",
+                    resultado: "ERROR",  // Valor corto
+                    descripcion: $"Error: {ex.Message}",
+                    servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
+                );
+
+                return (false, $"Error interno: {ex.Message}", null);
             }
         }
     }

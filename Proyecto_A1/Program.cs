@@ -112,6 +112,8 @@ builder.Services.AddScoped<ICoreBancarioService, CoreBancarioService>();
 
 builder.Services.AddScoped<ICoreBancarioService, CoreBancarioService>();
 
+builder.Services.AddScoped<IAfiliacionService, AfiliacionService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

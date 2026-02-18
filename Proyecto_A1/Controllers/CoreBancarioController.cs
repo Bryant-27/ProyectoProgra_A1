@@ -292,5 +292,67 @@ namespace Proyecto_A1.Controllers
                 });
             }
         }
+
+        // SRV13: Consultar saldo por teléfono
+        [HttpGet("accounts/balance")]
+        public async Task<IActionResult> ConsultarSaldoPorTelefono([FromQuery] string telefono, [FromQuery] string identificacion)
+        {
+            try
+            {
+                // Validar datos requeridos
+                if (string.IsNullOrWhiteSpace(telefono) || string.IsNullOrWhiteSpace(identificacion))
+                {
+                    return BadRequest(new CoreResponseDto
+                    {
+                        Codigo = -1,
+                        Descripcion = "Debe enviar los datos completos y válidos"
+                    });
+                }
+
+                // Llamar al servicio
+                var (exito, mensaje, saldo) = await _coreService.ConsultarSaldoPorTelefonoAsync(telefono, identificacion);
+
+                if (!exito)
+                {
+                    // Si el error es de negocio, devolvemos 400 con el mensaje específico
+                    return BadRequest(new CoreResponseDto
+                    {
+                        Codigo = -1,
+                        Descripcion = mensaje
+                    });
+                }
+
+                await _bitacoraService.RegistrarAccionBitacora(
+                    usuario: ObtenerUsuarioActual(),
+                    accion: "CONSULTA_SALDO_TELEFONO",
+                    resultado: "EXITO",
+                    descripcion: $"Saldo consultado para teléfono {telefono}: {saldo:C}",
+                    servicio: "CoreBancarioController.ConsultarSaldoPorTelefono"
+                );
+
+                return Ok(new SaldoResponseDto
+                {
+                    Codigo = 0,
+                    Descripcion = mensaje,
+                    Saldo = saldo
+                });
+            }
+            catch (Exception ex)
+            {
+                await _bitacoraService.RegistrarAccionBitacora(
+                    usuario: ObtenerUsuarioActual(),
+                    accion: "CONSULTA_SALDO_TELEFONO",
+                    resultado: "ERROR",
+                    descripcion: $"Error: {ex.Message}",
+                    servicio: "CoreBancarioController.ConsultarSaldoPorTelefono"
+                );
+
+                return StatusCode(500, new CoreResponseDto
+                {
+                    Codigo = -1,
+                    Descripcion = "Error interno del servidor"
+                });
+            }
+        }
     }
 }
