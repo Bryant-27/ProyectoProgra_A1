@@ -58,7 +58,7 @@ public static class TablaPantallasEndpoints
             [FromServices] IBitacoraService bitacora) =>
         {
 
-            var usuario = "Usuario desconocido"; // Aquí podrías obtener el usuario autenticado desde el contexto
+            var usuario = "Usuario desconocido"; 
             var pantalla = await db.TablaPantallas
                .AsNoTracking()
                .FirstOrDefaultAsync(model => model.IdPantalla == idpantalla);
