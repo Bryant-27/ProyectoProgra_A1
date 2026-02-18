@@ -13,7 +13,7 @@ public static class UsuariosEndpoints
     public static void MapUsuariosEndpoints(this IEndpointRouteBuilder routes)
     {
 
-        var group = routes.MapGroup("/endpoint/user").RequireAuthorization();
+        var group = routes.MapGroup("/endpoint/user").RequireAuthorization().WithTags(nameof(Usuarios));
 
         // [FromServices] se agrega para inyectar el contexto de la base de datos
         // [FromServices] se utiliza para indicar que el PagosMovilesContext
@@ -140,7 +140,7 @@ public static class UsuariosEndpoints
 
         group.MapPut("/{idusuario}", async Task<Results<Ok, NotFound>> (
             int idusuario, 
-            Usuarios usuarios, 
+            [FromBody] Usuarios usuarios, 
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora) =>
         {
@@ -158,21 +158,6 @@ public static class UsuariosEndpoints
            .SetProperty(m => m.IdEstado, usuarios.IdEstado)
            .SetProperty(m => m.IdRol, usuarios.IdRol)
        );
-
-            //var affected = await db.Usuarios
-            //    .Where(model => model.IdUsuario == idusuario)
-            //    .ExecuteUpdateAsync(setters => setters
-            //        .SetProperty(m => m.IdUsuario, usuarios.IdUsuario)
-            //        .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto)
-            //        .SetProperty(m => m.TipoIdentificacion, usuarios.TipoIdentificacion)
-            //        .SetProperty(m => m.Identificacion, usuarios.Identificacion)
-            //        .SetProperty(m => m.Email, usuarios.Email)
-            //        .SetProperty(m => m.Telefono, usuarios.Telefono)
-            //        .SetProperty(m => m.Usuario, usuarios.Usuario)
-            //        .SetProperty(m => m.Contraseña, usuarios.Contraseña) 
-            //        .SetProperty(m => m.IdEstado, usuarios.IdEstado)
-            //        .SetProperty(m => m.IdRol, usuarios.IdRol)
-            //        );
 
             if (affected == 1)
             {
@@ -197,7 +182,6 @@ public static class UsuariosEndpoints
 
             return TypedResults.NotFound();
 
-            //return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
         })
         .WithName("UpdateUsuarios")
         .WithOpenApi();
@@ -205,7 +189,7 @@ public static class UsuariosEndpoints
         /*======= METODO POST ======*/
 
         group.MapPost("/", async (
-            Usuarios usuarios, 
+            [FromBody] Usuarios usuarios, 
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora) =>
         {

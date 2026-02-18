@@ -17,7 +17,8 @@ public static class TablaPantallasEndpoints
         // los endpoints relacionados con TablaPantallas, mejorando
         // la seguridad de la aplicación.
 
-        var group = routes.MapGroup("/screen").RequireAuthorization();
+        var group = routes.MapGroup("/screen").RequireAuthorization().WithTags(nameof(TablaPantallas));
+
 
         // Probar todas estas APIS en Postman o en el navegador
         // Con el punto Todos los datos son requeridos y no pueden ser vacíos ni espacios en blanco.
@@ -49,7 +50,7 @@ public static class TablaPantallasEndpoints
         .WithName("GetAllTablaPantallas")
         .WithOpenApi();
 
-        /*------- METODOS GET A LOS USUARIOS POR LLAVE PRIMARIA-------*/
+        /*========= METODOS GET A LOS USUARIOS POR LLAVE PRIMARIA ==========*/
 
         group.MapGet("/{id}", async Task<Results<Ok<TablaPantallas>, NotFound>> (
             int idpantalla, 
@@ -89,8 +90,14 @@ public static class TablaPantallasEndpoints
 
         /*==== METODOS PUT ======*/
 
-        group.MapPut("/{idpantalla:int}", async Task<IResult> (int idpantalla,[FromBody] TablaPantallas tablaPantallas,[FromServices] PagosMovilesContext db) =>
+        group.MapPut("/{idpantalla:int}", async Task<IResult> (
+            int idpantalla,
+            [FromBody] TablaPantallas tablaPantallas,
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
         {
+
+            
 
             if (idpantalla <= 0)
             {
@@ -151,9 +158,42 @@ public static class TablaPantallasEndpoints
             }
 
             /* ===== ACTUALIZAR DATOS ===== */
-            pantallaDb.Nombre = tablaPantallas.Nombre.Trim();
-            pantallaDb.Descripcion = tablaPantallas.Descripcion.Trim();
-            pantallaDb.Ruta = tablaPantallas.Ruta.Trim();
+
+            var affected = await db.TablaPantallas
+                .Where(model => model.IdPantalla == idpantalla)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(model => model.Nombre, tablaPantallas.Nombre.Trim())
+                    .SetProperty(model => model.Descripcion, tablaPantallas.Descripcion.Trim())
+                    .SetProperty(model => model.Ruta, tablaPantallas.Ruta.Trim())
+                );
+
+            //pantallaDb.Nombre = tablaPantallas.Nombre.Trim();
+            //pantallaDb.Descripcion = tablaPantallas.Descripcion.Trim();
+            //pantallaDb.Ruta = tablaPantallas.Ruta.Trim();
+
+            if (affected == 1)
+            {
+                await bitacora.RegistrarAccionBitacora(
+                    "Sistema",
+                    "Actualizar Usuario",
+                    "Exitoso",
+                    $"Usuario {idpantalla} actualizado",
+                    "UsuariosEndpoint - PUT"
+                );
+
+                return TypedResults.Ok();
+            }
+
+            await bitacora.RegistrarAccionBitacora(
+                "Sistema",
+                "Actualizar Pantalla",
+                "No encontrado",
+                $"Intento de actualizar pantalla {idpantalla}",
+                "UsuariosEndpoint - PUT"
+            );
+
+            //return TypedResults.NotFound();
+
 
             await db.SaveChangesAsync();
 
@@ -165,13 +205,18 @@ public static class TablaPantallasEndpoints
                 data = pantallaDb
             });
 
+
+
         })
         .WithName("UpdateTablaPantallas")
         .WithOpenApi();
 
         /*==== METODOS POST ======*/
 
-        group.MapPost("/", async ([FromBody] TablaPantallas tablaPantallas,[FromServices] PagosMovilesContext db) =>
+        group.MapPost("/", async (
+            [FromBody] TablaPantallas tablaPantallas,
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
         {
 
             /*===== VALIDACIONES =====*/
@@ -221,6 +266,16 @@ public static class TablaPantallasEndpoints
 
             db.TablaPantallas.Add(tablaPantallas);
             await db.SaveChangesAsync();
+            
+            //Registro en bitacora
+
+            await bitacora.RegistrarAccionBitacora(
+               "Sistema",
+               "Crear pantalla",
+               "Éxito",
+               $"Se creó la pantalla con ID {tablaPantallas.IdPantalla}."
+           );
+
             return TypedResults.Created($"/api/TablaPantallas/{tablaPantallas.IdPantalla}",tablaPantallas);
         })
         .WithName("CreateTablaPantallas")
@@ -256,7 +311,7 @@ public static class TablaPantallasEndpoints
                 $"Se eliminó la pantalla con ID {idpantalla}."
             );
 
-            return TypedResults.NotFound();
+            return TypedResults.Ok();
 
         })
         .WithName("DeleteTablaPantallas")
