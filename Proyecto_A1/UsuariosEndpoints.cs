@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
-using Logica_Negocio.Services.Interfaces;
+using Logica_Negocio.Services;
 
 namespace Proyecto_A1;
 
@@ -13,7 +13,7 @@ public static class UsuariosEndpoints
     public static void MapUsuariosEndpoints(this IEndpointRouteBuilder routes)
     {
 
-        var group = routes.MapGroup("/endpoint/user").RequireAuthorization();
+        var group = routes.MapGroup("/endpoint/user").RequireAuthorization().WithTags(nameof(Usuarios));
 
         // [FromServices] se agrega para inyectar el contexto de la base de datos
         // [FromServices] se utiliza para indicar que el PagosMovilesContext
@@ -38,7 +38,7 @@ public static class UsuariosEndpoints
 
             var lista = await db.Usuarios.ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "GET: CONSULTA_GENERAL",
                 "ÉXITO",
@@ -66,7 +66,7 @@ public static class UsuariosEndpoints
 
             if (usuario is null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     "Sistema",
                     "Consultar Usuario",
                     "No encontrado",
@@ -77,7 +77,7 @@ public static class UsuariosEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Consultar Usuario",
                 "Exitoso",
@@ -86,19 +86,18 @@ public static class UsuariosEndpoints
             );
 
             return TypedResults.Ok(usuario);
-
-            //return await db.Usuarios.AsNoTracking()
-            //    .FirstOrDefaultAsync(model => model.IdUsuario == idusuario)
-            //    is Usuarios model
-            //        ? TypedResults.Ok(model)
-            //        : TypedResults.NotFound();
         })
         .WithName("GetUsuariosById")
         .WithOpenApi();
 
         /*------- METODOS GET TRAER A LOS USUARIOS POR IDENTIFICACION, NOMBRE Y TIPO -------*/
 
-        group.MapGet("/filtro", async ([FromQuery] string? identificacion, [FromQuery] string? nombre, [FromQuery] string? tipo, [FromServices] PagosMovilesContext db) =>
+        group.MapGet("/filtro", async (
+            [FromQuery] string? identificacion, 
+            [FromQuery] string? nombre, 
+            [FromQuery] string? tipo, 
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
         {
             var query = db.Usuarios.AsNoTracking().AsQueryable();
 
@@ -140,7 +139,7 @@ public static class UsuariosEndpoints
 
         group.MapPut("/{idusuario}", async Task<Results<Ok, NotFound>> (
             int idusuario, 
-            Usuarios usuarios, 
+            [FromBody] Usuarios usuarios, 
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora) =>
         {
@@ -159,24 +158,9 @@ public static class UsuariosEndpoints
            .SetProperty(m => m.IdRol, usuarios.IdRol)
        );
 
-            //var affected = await db.Usuarios
-            //    .Where(model => model.IdUsuario == idusuario)
-            //    .ExecuteUpdateAsync(setters => setters
-            //        .SetProperty(m => m.IdUsuario, usuarios.IdUsuario)
-            //        .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto)
-            //        .SetProperty(m => m.TipoIdentificacion, usuarios.TipoIdentificacion)
-            //        .SetProperty(m => m.Identificacion, usuarios.Identificacion)
-            //        .SetProperty(m => m.Email, usuarios.Email)
-            //        .SetProperty(m => m.Telefono, usuarios.Telefono)
-            //        .SetProperty(m => m.Usuario, usuarios.Usuario)
-            //        .SetProperty(m => m.Contraseña, usuarios.Contraseña) 
-            //        .SetProperty(m => m.IdEstado, usuarios.IdEstado)
-            //        .SetProperty(m => m.IdRol, usuarios.IdRol)
-            //        );
-
             if (affected == 1)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     "Sistema",
                     "Actualizar Usuario",
                     "Exitoso",
@@ -187,7 +171,7 @@ public static class UsuariosEndpoints
                 return TypedResults.Ok();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Actualizar Usuario",
                 "No encontrado",
@@ -197,7 +181,6 @@ public static class UsuariosEndpoints
 
             return TypedResults.NotFound();
 
-            //return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
         })
         .WithName("UpdateUsuarios")
         .WithOpenApi();
@@ -205,7 +188,7 @@ public static class UsuariosEndpoints
         /*======= METODO POST ======*/
 
         group.MapPost("/", async (
-            Usuarios usuarios, 
+            [FromBody] Usuarios usuarios, 
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora) =>
         {
@@ -270,7 +253,7 @@ public static class UsuariosEndpoints
             db.Usuarios.Add(usuarios);
             await db.SaveChangesAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Crear Usuario",
                 "Exitoso",
@@ -300,7 +283,7 @@ public static class UsuariosEndpoints
 
             if (affected == 1)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     "Sistema",
                     "Eliminar Usuario",
                     "Exitoso",
@@ -311,7 +294,7 @@ public static class UsuariosEndpoints
                 return TypedResults.Ok();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Eliminar Usuario",
                 "No encontrado",
@@ -321,8 +304,6 @@ public static class UsuariosEndpoints
 
             return TypedResults.NotFound();
 
-
-            //return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
         })
         .WithName("DeleteUsuarios")
         .WithOpenApi();

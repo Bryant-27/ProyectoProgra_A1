@@ -2,13 +2,23 @@
 using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.AspNetCore.Mvc;
+using Logica_Negocio.Services;
 namespace Proyecto_A1;
 
 public static class TablaPantallasEndpoints
 {
     public static void MapTablaPantallasEndpoints (this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/screen").WithTags(nameof(TablaPantallas));
+
+        // Se cambia a RequireAuthorization para proteger las rutas y
+        // requerir autenticación para acceder a ellas. Esto asegura
+        // que solo los usuarios autenticados puedan interactuar con
+        // los endpoints relacionados con TablaPantallas, mejorando
+        // la seguridad de la aplicación.
+
+        var group = routes.MapGroup("/screen").RequireAuthorization().WithTags(nameof(TablaPantallas));
+
 
         // Probar todas estas APIS en Postman o en el navegador
         // Con el punto Todos los datos son requeridos y no pueden ser vacíos ni espacios en blanco.
@@ -17,30 +27,77 @@ public static class TablaPantallasEndpoints
 
         /*------- METODOS GET TRAER TODOS LOS USUARIOS -------*/
 
-        group.MapGet("/", async (PagosMovilesContext db) =>
+        group.MapGet("/", async (
+            [FromServices] IBitacoraService bitacora,
+            [FromServices] PagosMovilesContext db,
+            HttpContext context) =>
         {
+
+            var usuario = context.User.Identity?.Name ?? "Usuario desconocido";
+
+            var listaPantallas = await db.TablaPantallas.ToListAsync();
+
+            await bitacora.RegistrarAsync(
+                usuario: usuario,
+                accion: "Obtener todas las pantallas",
+                resultado: "Éxito",
+                descripcion: $"Se obtuvieron {listaPantallas.Count} pantallas."
+            );
+
+
             return await db.TablaPantallas.ToListAsync();
         })
         .WithName("GetAllTablaPantallas")
         .WithOpenApi();
 
-        /*------- METODOS GET A LOS USUARIOS POR LLAVE PRIMARIA-------*/
+        /*========= METODOS GET A LOS USUARIOS POR LLAVE PRIMARIA ==========*/
 
-        group.MapGet("/{id}", async Task<Results<Ok<TablaPantallas>, NotFound>> (int idpantalla, PagosMovilesContext db) =>
+        group.MapGet("/{id}", async Task<Results<Ok<TablaPantallas>, NotFound>> (
+            int idpantalla, 
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
         {
-            return await db.TablaPantallas.AsNoTracking()
-                .FirstOrDefaultAsync(model => model.IdPantalla == idpantalla)
-                is TablaPantallas model
-                    ? TypedResults.Ok(model)
-                    : TypedResults.NotFound();
+
+            var usuario = "Usuario desconocido"; 
+            var pantalla = await db.TablaPantallas
+               .AsNoTracking()
+               .FirstOrDefaultAsync(model => model.IdPantalla == idpantalla);
+
+            if (pantalla is null)
+            {
+                await bitacora.RegistrarAsync(
+                    usuario,
+                    "Obtener pantalla por ID",
+                    "No encontrado",
+                    $"No se encontró la pantalla con ID {idpantalla}."
+                );
+
+                return TypedResults.NotFound();
+            }
+
+            await bitacora.RegistrarAsync(
+                usuario,
+                "Obtener pantalla por ID",
+                "Éxito",
+                $"Se obtuvo la pantalla con ID {idpantalla}."
+                );
+
+            return TypedResults.Ok(pantalla);
+
         })
         .WithName("GetTablaPantallasById")
         .WithOpenApi();
 
         /*==== METODOS PUT ======*/
 
-        group.MapPut("/{idpantalla:int}", async Task<IResult> (int idpantalla, TablaPantallas tablaPantallas, PagosMovilesContext db) =>
+        group.MapPut("/{idpantalla:int}", async Task<IResult> (
+            int idpantalla,
+            [FromBody] TablaPantallas tablaPantallas,
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
         {
+
+            
 
             if (idpantalla <= 0)
             {
@@ -101,9 +158,42 @@ public static class TablaPantallasEndpoints
             }
 
             /* ===== ACTUALIZAR DATOS ===== */
-            pantallaDb.Nombre = tablaPantallas.Nombre.Trim();
-            pantallaDb.Descripcion = tablaPantallas.Descripcion.Trim();
-            pantallaDb.Ruta = tablaPantallas.Ruta.Trim();
+
+            var affected = await db.TablaPantallas
+                .Where(model => model.IdPantalla == idpantalla)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(model => model.Nombre, tablaPantallas.Nombre.Trim())
+                    .SetProperty(model => model.Descripcion, tablaPantallas.Descripcion.Trim())
+                    .SetProperty(model => model.Ruta, tablaPantallas.Ruta.Trim())
+                );
+
+            //pantallaDb.Nombre = tablaPantallas.Nombre.Trim();
+            //pantallaDb.Descripcion = tablaPantallas.Descripcion.Trim();
+            //pantallaDb.Ruta = tablaPantallas.Ruta.Trim();
+
+            if (affected == 1)
+            {
+                await bitacora.RegistrarAsync(
+                    "Sistema",
+                    "Actualizar Usuario",
+                    "Exitoso",
+                    $"Usuario {idpantalla} actualizado",
+                    "UsuariosEndpoint - PUT"
+                );
+
+                return TypedResults.Ok();
+            }
+
+            await bitacora.RegistrarAsync(
+                "Sistema",
+                "Actualizar Pantalla",
+                "No encontrado",
+                $"Intento de actualizar pantalla {idpantalla}",
+                "UsuariosEndpoint - PUT"
+            );
+
+            //return TypedResults.NotFound();
+
 
             await db.SaveChangesAsync();
 
@@ -115,13 +205,18 @@ public static class TablaPantallasEndpoints
                 data = pantallaDb
             });
 
+
+
         })
         .WithName("UpdateTablaPantallas")
         .WithOpenApi();
 
         /*==== METODOS POST ======*/
 
-        group.MapPost("/", async (TablaPantallas tablaPantallas, PagosMovilesContext db) =>
+        group.MapPost("/", async (
+            [FromBody] TablaPantallas tablaPantallas,
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
         {
 
             /*===== VALIDACIONES =====*/
@@ -171,6 +266,16 @@ public static class TablaPantallasEndpoints
 
             db.TablaPantallas.Add(tablaPantallas);
             await db.SaveChangesAsync();
+            
+            //Registro en bitacora
+
+            await bitacora.RegistrarAsync(
+               "Sistema",
+               "Crear pantalla",
+               "Éxito",
+               $"Se creó la pantalla con ID {tablaPantallas.IdPantalla}."
+           );
+
             return TypedResults.Created($"/api/TablaPantallas/{tablaPantallas.IdPantalla}",tablaPantallas);
         })
         .WithName("CreateTablaPantallas")
@@ -178,12 +283,36 @@ public static class TablaPantallasEndpoints
 
         /*==== METODOS DELETE ======*/
 
-        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (int idpantalla, PagosMovilesContext db) =>
+        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (
+            int idpantalla, 
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitadora) =>
         {
+
             var affected = await db.TablaPantallas
-                .Where(model => model.IdPantalla == idpantalla)
-                .ExecuteDeleteAsync();
-            return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
+            .Where(model => model.IdPantalla == idpantalla)
+            .ExecuteDeleteAsync();
+
+            if (affected == 0)
+            {
+                await bitadora.RegistrarAsync(
+                    "Usuario desconocido",
+                    "Eliminar pantalla",
+                    "No encontrado",
+                    $"No se encontró la pantalla con ID {idpantalla} para eliminar."
+                );
+                return TypedResults.NotFound();
+            }
+
+            await bitadora.RegistrarAsync(
+                "Usuario desconocido",
+                "Eliminar pantalla",
+                "Éxito",
+                $"Se eliminó la pantalla con ID {idpantalla}."
+            );
+
+            return TypedResults.Ok();
+
         })
         .WithName("DeleteTablaPantallas")
         .WithOpenApi();
