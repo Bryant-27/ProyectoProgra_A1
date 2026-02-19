@@ -10,7 +10,7 @@ public static class ParametrosEndpoints
 {
     public static void MapParametrosEndpoints (this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/parametro").WithTags(nameof(Parametros));
+        var group = routes.MapGroup("/parametro").RequireAuthorization().WithTags(nameof(Parametros));
 
         // ===== METODOS GET =====
 
