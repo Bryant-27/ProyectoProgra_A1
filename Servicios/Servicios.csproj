@@ -11,10 +11,12 @@
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.5" />
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.5" />
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.5" />
+	  <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
 	  <PackageReference Include="System.Text.Json" Version="9.0.5" />  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DataAccess\DataAccess.csproj" />
+    <ProjectReference Include="..\Logica_Negocio\Logica_Negocio.csproj" />
   </ItemGroup>
 
 </Project>

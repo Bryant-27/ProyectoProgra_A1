@@ -29,7 +29,7 @@ public static class TablaPantallasEndpoints
         /*------- METODOS GET TRAER TODOS LOS USUARIOS -------*/
 
         group.MapGet("/", async (
-            IBitacoraService bitacora,
+            [FromServices] IBitacoraService bitacora,
             [FromServices] PagosMovilesContext db,
             HttpContext context) =>
         {
@@ -38,8 +38,8 @@ public static class TablaPantallasEndpoints
 
             var listaPantallas = await db.TablaPantallas.ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
-                usuario,
+            await bitacora.RegistrarAsync(
+                usuario: usuario,
                 accion: "Obtener todas las pantallas",
                 resultado: "Éxito",
                 descripcion: $"Se obtuvieron {listaPantallas.Count} pantallas."
@@ -66,7 +66,7 @@ public static class TablaPantallasEndpoints
 
             if (pantalla is null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Obtener pantalla por ID",
                     "No encontrado",
@@ -76,7 +76,7 @@ public static class TablaPantallasEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Obtener pantalla por ID",
                 "Éxito",
@@ -112,29 +112,23 @@ public static class TablaPantallasEndpoints
 
             if (!existe)
             {
-                await bitacora.RegistrarAccionBitacora(
-                    usuario,
-                    "Actualizar pantalla",
-                    "No encontrado",
-                    $"Pantalla {idpantalla} no existe"
+                await bitacora.RegistrarAsync(
+                    "Sistema",
+                    "Actualizar Usuario",
+                    "Exitoso",
+                    $"Usuario {idpantalla} actualizado",
+                    "UsuariosEndpoint - PUT"
                 );
 
                 return ApiResponse<TablaPantallas>.NotFound("Pantalla no encontrada");
             }
 
-            await db.TablaPantallas
-                .Where(x => x.IdPantalla == idpantalla)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.Nombre, pantalla.Nombre.Trim())
-                    .SetProperty(x => x.Descripcion, pantalla.Descripcion.Trim())
-                    .SetProperty(x => x.Ruta, pantalla.Ruta.Trim())
-                );
-
-            await bitacora.RegistrarAccionBitacora(
-                usuario,
-                "Actualizar pantalla",
-                "Éxito",
-                $"Pantalla {idpantalla} actualizada"
+            await bitacora.RegistrarAsync(
+                "Sistema",
+                "Actualizar Pantalla",
+                "No encontrado",
+                $"Intento de actualizar pantalla {idpantalla}",
+                "UsuariosEndpoint - PUT"
             );
 
             return ApiResponse<TablaPantallas>.Success(null, "Pantalla actualizada");
@@ -170,12 +164,12 @@ public static class TablaPantallasEndpoints
             db.TablaPantallas.Add(pantalla);
             await db.SaveChangesAsync();
 
-            await bitacora.RegistrarAccionBitacora(
-                usuario,
-                "Crear pantalla",
-                "Éxito",
-                $"Pantalla {pantalla.IdPantalla} creada"
-            );
+            await bitacora.RegistrarAsync(
+               "Sistema",
+               "Crear pantalla",
+               "Éxito",
+               $"Se creó la pantalla con ID {tablaPantallas.IdPantalla}."
+           );
 
             return ApiResponse<TablaPantallas>.Success(pantalla, "Pantalla creada correctamente");
         })
@@ -198,8 +192,8 @@ public static class TablaPantallasEndpoints
 
             if (affected == 0)
             {
-                await bitacora.RegistrarAccionBitacora(
-                    usuario,
+                await bitadora.RegistrarAsync(
+                    "Usuario desconocido",
                     "Eliminar pantalla",
                     "No encontrado",
                     $"Pantalla {idpantalla} no existe"
@@ -208,8 +202,8 @@ public static class TablaPantallasEndpoints
                 return ApiResponse<object>.NotFound("Pantalla no encontrada");
             }
 
-            await bitacora.RegistrarAccionBitacora(
-                usuario,
+            await bitadora.RegistrarAsync(
+                "Usuario desconocido",
                 "Eliminar pantalla",
                 "Éxito",
                 $"Pantalla {idpantalla} eliminada"

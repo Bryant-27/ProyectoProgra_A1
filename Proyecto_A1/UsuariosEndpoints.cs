@@ -39,7 +39,7 @@ public static class UsuariosEndpoints
 
             var lista = await db.Usuarios.ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "GET: CONSULTA_GENERAL",
                 "ÉXITO",
@@ -67,7 +67,7 @@ public static class UsuariosEndpoints
 
             if (usuario is null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     "Sistema",
                     "Consultar Usuario",
                     "No encontrado",
@@ -78,7 +78,7 @@ public static class UsuariosEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Consultar Usuario",
                 "Exitoso",
@@ -87,19 +87,18 @@ public static class UsuariosEndpoints
             );
 
             return TypedResults.Ok(usuario);
-
-            //return await db.Usuarios.AsNoTracking()
-            //    .FirstOrDefaultAsync(model => model.IdUsuario == idusuario)
-            //    is Usuarios model
-            //        ? TypedResults.Ok(model)
-            //        : TypedResults.NotFound();
         })
         .WithName("GetUsuariosById")
         .WithOpenApi();
 
         /*------- METODOS GET TRAER A LOS USUARIOS POR IDENTIFICACION, NOMBRE Y TIPO -------*/
 
-        group.MapGet("/filtro", async ([FromQuery] string? identificacion, [FromQuery] string? nombre, [FromQuery] string? tipo, [FromServices] PagosMovilesContext db) =>
+        group.MapGet("/filtro", async (
+            [FromQuery] string? identificacion, 
+            [FromQuery] string? nombre, 
+            [FromQuery] string? tipo, 
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
         {
             var query = db.Usuarios.AsNoTracking().AsQueryable();
 
@@ -162,12 +161,22 @@ public static class UsuariosEndpoints
                     .SetProperty(m => m.Contraseña, usuarios.Contraseña)
                     .SetProperty(m => m.IdEstado, usuarios.IdEstado)
                     .SetProperty(m => m.IdRol, usuarios.IdRol)
+                    );
+
+            if (affected == 1)
+            {
+                await bitacora.RegistrarAsync(
+                    "Sistema",
+                    "Actualizar Usuario",
+                    "Exitoso",
+                    $"Usuario {idusuario} actualizado",
+                    "UsuariosEndpoint - PUT"
                 );
 
             if (affected == 0)
                 return ApiResponse<object>.NotFound("Usuario no encontrado");
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Actualizar Usuario",
                 "Exitoso",
@@ -203,7 +212,7 @@ public static class UsuariosEndpoints
             db.Usuarios.Add(usuarios);
             await db.SaveChangesAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Crear Usuario",
                 "Exitoso",
@@ -233,10 +242,20 @@ public static class UsuariosEndpoints
                 .Where(model => model.IdUsuario == idusuario)
                 .ExecuteDeleteAsync();
 
-            if (affected == 0)
-                return ApiResponse<object>.NotFound("Usuario no encontrado");
+            if (affected == 1)
+            {
+                await bitacora.RegistrarAsync(
+                    "Sistema",
+                    "Eliminar Usuario",
+                    "Exitoso",
+                    $"Usuario {idusuario} eliminado",
+                    "UsuariosEndpoint - DELETE"
+                );
 
-            await bitacora.RegistrarAccionBitacora(
+                return TypedResults.Ok();
+            }
+
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Eliminar Usuario",
                 "Exitoso",

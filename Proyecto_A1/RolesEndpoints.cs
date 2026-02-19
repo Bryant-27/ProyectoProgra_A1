@@ -3,10 +3,8 @@ using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
-using Logica_Negocio.Services.Interfaces;
 using Entities;
-using Azure.Core;
-using Proyecto_A1.Helper;
+using Logica_Negocio.Services;
 
 namespace Proyecto_A1;
 
@@ -45,12 +43,12 @@ public static class RolesEndpoints
                })
                .ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
-               usuario: usuario,
-               accion: "Consulta de roles",
-               resultado: "Éxito",
-               descripcion: $"El usuario {usuario} consultó la lista de roles."
-           );
+            await bitacora.RegistrarAsync(
+                usuario: usuario,
+                accion: "Consulta de roles",
+                resultado: "Éxito",
+                descripcion: $"El usuario {usuario} consultó la lista de roles."
+            );
 
             return Results.Ok(roles);
 
@@ -82,7 +80,7 @@ public static class RolesEndpoints
 
             if (rol == null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Obtener rol",
                     "No encontrado",
@@ -92,7 +90,7 @@ public static class RolesEndpoints
                 return ApiResponse<RolDTO>.NotFound($"No existe el rol con ID {id}");
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Obtener rol",
                 "Éxito",
