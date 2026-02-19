@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
-using Logica_Negocio.Services.Interfaces;
 using Proyecto_A1.Helper;
+using Logica_Negocio.Services;
 
 namespace Proyecto_A1;
 
@@ -139,10 +139,10 @@ public static class UsuariosEndpoints
         /*======= METODO PUT ======*/
 
         group.MapPut("/{idusuario}", async (
-            int idusuario,
-            [FromBody] Usuarios usuarios,
-            [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+          int idusuario,
+          [FromBody] Usuarios usuarios,
+          [FromServices] PagosMovilesContext db,
+          [FromServices] IBitacoraService bitacora) =>
         {
             var errores = ValidationHelper.ValidarModelo(usuarios);
 
@@ -152,29 +152,29 @@ public static class UsuariosEndpoints
             var affected = await db.Usuarios
                 .Where(model => model.IdUsuario == idusuario)
                 .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto)
+                    .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto.Trim())
                     .SetProperty(m => m.TipoIdentificacion, usuarios.TipoIdentificacion)
-                    .SetProperty(m => m.Identificacion, usuarios.Identificacion)
-                    .SetProperty(m => m.Email, usuarios.Email)
-                    .SetProperty(m => m.Telefono, usuarios.Telefono)
-                    .SetProperty(m => m.Usuario, usuarios.Usuario)
-                    .SetProperty(m => m.Contraseña, usuarios.Contraseña)
+                    .SetProperty(m => m.Identificacion, usuarios.Identificacion.Trim())
+                    .SetProperty(m => m.Email, usuarios.Email.Trim())
+                    .SetProperty(m => m.Telefono, usuarios.Telefono.Trim())
+                    .SetProperty(m => m.Usuario, usuarios.Usuario.Trim())
+                    .SetProperty(m => m.Contraseña, usuarios.Contraseña) // hashear si aplica
                     .SetProperty(m => m.IdEstado, usuarios.IdEstado)
                     .SetProperty(m => m.IdRol, usuarios.IdRol)
-                    );
+                );
 
-            if (affected == 1)
+            if (affected == 0)
             {
                 await bitacora.RegistrarAsync(
                     "Sistema",
                     "Actualizar Usuario",
-                    "Exitoso",
-                    $"Usuario {idusuario} actualizado",
+                    "No encontrado",
+                    $"Intento de actualizar usuario {idusuario}",
                     "UsuariosEndpoint - PUT"
                 );
 
-            if (affected == 0)
                 return ApiResponse<object>.NotFound("Usuario no encontrado");
+            }
 
             await bitacora.RegistrarAsync(
                 "Sistema",
@@ -191,6 +191,7 @@ public static class UsuariosEndpoints
         })
         .WithName("UpdateUsuarios")
         .WithOpenApi();
+
 
 
         /*======= METODO POST ======*/

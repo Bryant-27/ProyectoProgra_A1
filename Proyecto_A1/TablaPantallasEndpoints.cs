@@ -3,8 +3,8 @@ using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
-using Logica_Negocio.Services.Interfaces;
 using Proyecto_A1.Helper;
+using Logica_Negocio.Services;
 namespace Proyecto_A1;
 
 public static class TablaPantallasEndpoints
@@ -168,7 +168,7 @@ public static class TablaPantallasEndpoints
                "Sistema",
                "Crear pantalla",
                "Éxito",
-               $"Se creó la pantalla con ID {tablaPantallas.IdPantalla}."
+               $"Se creó la pantalla con ID {pantalla.IdPantalla}."
            );
 
             return ApiResponse<TablaPantallas>.Success(pantalla, "Pantalla creada correctamente");
@@ -192,7 +192,7 @@ public static class TablaPantallasEndpoints
 
             if (affected == 0)
             {
-                await bitadora.RegistrarAsync(
+                await bitacora.RegistrarAsync(
                     "Usuario desconocido",
                     "Eliminar pantalla",
                     "No encontrado",
@@ -202,7 +202,7 @@ public static class TablaPantallasEndpoints
                 return ApiResponse<object>.NotFound("Pantalla no encontrada");
             }
 
-            await bitadora.RegistrarAsync(
+            await bitacora.RegistrarAsync(
                 "Usuario desconocido",
                 "Eliminar pantalla",
                 "Éxito",

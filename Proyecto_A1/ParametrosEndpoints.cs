@@ -3,7 +3,7 @@ using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
-using Logica_Negocio.Services.Interfaces;
+using Logica_Negocio.Services;
 using Proyecto_A1.Helper;
 namespace Proyecto_A1;
 
@@ -25,7 +25,7 @@ public static class ParametrosEndpoints
 
             var lista = await db.Parametros.ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 accion: "Obtener todas los Parametro",
                 resultado: "Éxito",
@@ -51,7 +51,7 @@ public static class ParametrosEndpoints
 
             if (model is null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     accion: "Obtener pantalla por ID",
                     resultado: "No encontrado",
@@ -60,7 +60,7 @@ public static class ParametrosEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                     usuario,
                     accion: "Obtener pantalla por ID",
                     resultado: "Éxito",
@@ -105,7 +105,7 @@ public static class ParametrosEndpoints
 
             if (affected == 0)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Actualizar parámetro",
                     "No encontrado",
@@ -115,7 +115,7 @@ public static class ParametrosEndpoints
                 return ApiResponse<Parametros>.NotFound("El parámetro no existe");
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Actualizar parámetro",
                 "Éxito",
@@ -158,7 +158,7 @@ public static class ParametrosEndpoints
             db.Parametros.Add(parametros);
             await db.SaveChangesAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Crear parámetro",
                 "Éxito",
@@ -186,7 +186,7 @@ public static class ParametrosEndpoints
 
             if (affected == 0)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Eliminar parámetro",
                     "No encontrado",
@@ -196,7 +196,7 @@ public static class ParametrosEndpoints
                 return ApiResponse<Parametros>.NotFound("El parámetro no existe");
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Eliminar parámetro",
                 "Éxito",

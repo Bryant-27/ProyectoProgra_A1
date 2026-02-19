@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Entities;
 using Logica_Negocio.Services;
+using Proyecto_A1.Helper;
 
 namespace Proyecto_A1;
 
@@ -152,7 +153,7 @@ public static class RolesEndpoints
 
             await db.SaveChangesAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Actualizar rol",
                 "Éxito",
@@ -198,7 +199,7 @@ public static class RolesEndpoints
 
             var respuesta = new RolDTO { IdRol = NewRol.IdRol, Nombre = NewRol.Nombre, Descripcion = NewRol.Descripcion, Pantallas = rol.Pantallas };
             
-            await bitacora.RegistrarAccionBitacora( usuario, "Crear nuevo rol", "Éxito", $"Se creó un nuevo rol con ID {NewRol.IdRol}." ); 
+            await bitacora.RegistrarAsync( usuario, "Crear nuevo rol", "Éxito", $"Se creó un nuevo rol con ID {NewRol.IdRol}." ); 
             
             return TypedResults.Created($"/api/Roles/{rol.IdRol}",respuesta); 
         }) 
@@ -228,7 +229,7 @@ public static class RolesEndpoints
             db.Roles.Remove(rol);
             await db.SaveChangesAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Eliminar rol",
                 "Éxito",

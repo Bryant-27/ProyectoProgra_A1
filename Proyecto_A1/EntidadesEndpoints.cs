@@ -3,7 +3,7 @@ using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
-using Logica_Negocio.Services.Interfaces;
+using Logica_Negocio.Services;
 using Proyecto_A1.Helper;
 namespace Proyecto_A1;
 
@@ -25,7 +25,7 @@ public static class EntidadesEndpoints
 
             var lista = await db.Entidades.ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 accion: "Obtener todas las Entidades Bancarias",
                 resultado: "Éxito",
@@ -53,7 +53,7 @@ public static class EntidadesEndpoints
 
             if (model is null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     accion: "Obtener entidad por ID",
                     resultado: "No encontrado",
@@ -62,7 +62,7 @@ public static class EntidadesEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                     usuario,
                     accion: "Obtener entidad por ID",
                     resultado: "Éxito",
@@ -93,7 +93,7 @@ public static class EntidadesEndpoints
 
             if (errores.Any())
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Actualizar entidad",
                     "Error",
@@ -113,7 +113,7 @@ public static class EntidadesEndpoints
 
             if (affected == 0)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Actualizar entidad",
                     "No encontrado",
@@ -123,7 +123,7 @@ public static class EntidadesEndpoints
                 return ApiResponse<object>.NotFound("Entidad no encontrada");
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Actualizar entidad",
                 "Éxito",
@@ -154,7 +154,7 @@ public static class EntidadesEndpoints
 
             if (errores.Any())
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Crear entidad",
                     "Error",
@@ -167,7 +167,7 @@ public static class EntidadesEndpoints
             db.Entidades.Add(entidades);
             await db.SaveChangesAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 accion: "Crear entidad",
                 resultado: "Éxito",
@@ -198,7 +198,7 @@ public static class EntidadesEndpoints
 
             if (affected == 0)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Eliminar entidad",
                     "No encontrado",
@@ -208,7 +208,7 @@ public static class EntidadesEndpoints
                 return ApiResponse<object>.NotFound("Entidad no encontrada");
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Eliminar entidad",
                 "Éxito",
