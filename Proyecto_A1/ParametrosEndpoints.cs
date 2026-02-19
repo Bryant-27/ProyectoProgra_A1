@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Logica_Negocio.Services.Interfaces;
+using Proyecto_A1.Helper;
 namespace Proyecto_A1;
 
 public static class ParametrosEndpoints
@@ -74,44 +75,55 @@ public static class ParametrosEndpoints
 
         // ===== METODOS PUT =====
 
-        group.MapPut("/{id}", async Task<Results<Ok, NotFound>> (
+        group.MapPut("/{id}", async (
             string idparametro,
-            [FromBody] Parametros parametros, 
+            [FromBody] Parametros parametros,
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora,
             HttpContext context) =>
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario no autenticado";
+
+            var errores = ValidationHelper.ValidarModelo(parametros);
+
+            if (ValidationHelper.EsVacio(parametros.IdParametro))
+                errores.Add("El IdParametro es obligatorio.");
+
+            if (ValidationHelper.EsVacio(parametros.Valor))
+                errores.Add("El valor es obligatorio.");
+
+            if (errores.Any())
+                return ApiResponse<Parametros>.Error(errores);
+
             var affected = await db.Parametros
-                .Where(model => model.IdParametro == idparametro)
+                .Where(m => m.IdParametro == idparametro)
                 .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(m => m.IdParametro, parametros.IdParametro)
-                    .SetProperty(m => m.Valor, parametros.Valor)
+                    .SetProperty(m => m.Valor, parametros.Valor.Trim())
                     .SetProperty(m => m.IdEstado, parametros.IdEstado)
                     .SetProperty(m => m.FechaCreacion, parametros.FechaCreacion)
-                    );
+                );
 
-            if (affected == 1)
+            if (affected == 0)
             {
                 await bitacora.RegistrarAccionBitacora(
-                    context.User.Identity?.Name ?? "Usuario no autenticado",
-                    accion: "Actualizar pantalla",
-                    resultado: "Éxito",
-                    descripcion: $"Se actualizó la pantalla con ID: {idparametro}."
+                    usuario,
+                    "Actualizar parámetro",
+                    "No encontrado",
+                    $"No existe el parámetro {idparametro}"
                 );
-                return TypedResults.Ok();
+
+                return ApiResponse<Parametros>.NotFound("El parámetro no existe");
             }
 
             await bitacora.RegistrarAccionBitacora(
-                context.User.Identity?.Name ?? "Usuario no autenticado",
-                accion: "Actualizar pantalla",
-                resultado: "No encontrado",
-                descripcion: $"No se encontró la pantalla con ID: {idparametro} para actualizar."
+                usuario,
+                "Actualizar parámetro",
+                "Éxito",
+                $"Parámetro {idparametro} actualizado"
             );
 
-            await db.SaveChangesAsync();
+            return ApiResponse<Parametros>.Success(null, "Parámetro actualizado correctamente");
 
-            return TypedResults.Ok();
-            
         })
         .WithName("UpdateParametros")
         .WithOpenApi();
@@ -119,61 +131,79 @@ public static class ParametrosEndpoints
         // ===== METODOS POST =====
 
         group.MapPost("/", async (
-            [FromBody] Parametros parametros, 
+            [FromBody] Parametros parametros,
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora,
             HttpContext context) =>
         {
             var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
+            var errores = ValidationHelper.ValidarModelo(parametros);
+
+            if (ValidationHelper.EsVacio(parametros.IdParametro))
+                errores.Add("El IdParametro es obligatorio.");
+
+            if (ValidationHelper.EsVacio(parametros.Valor))
+                errores.Add("El valor es obligatorio.");
+
+            var existe = await db.Parametros
+                .AnyAsync(p => p.IdParametro == parametros.IdParametro);
+
+            if (existe)
+                errores.Add($"El parámetro {parametros.IdParametro} ya existe.");
+
+            if (errores.Any())
+                return ApiResponse<Parametros>.Error(errores);
+
             db.Parametros.Add(parametros);
             await db.SaveChangesAsync();
 
             await bitacora.RegistrarAccionBitacora(
                 usuario,
-                accion: "Crear pantalla",
-                resultado: "Éxito",
-                descripcion: $"Se creó la pantalla con ID: {parametros.IdParametro}."
+                "Crear parámetro",
+                "Éxito",
+                $"Parámetro {parametros.IdParametro} creado"
             );
 
-            return TypedResults.Created($"/parametro/{parametros.IdParametro}",parametros);
+            return ApiResponse<Parametros>.Success(parametros, "Parámetro creado correctamente");
         })
         .WithName("CreateParametros")
         .WithOpenApi();
 
         // ===== METODOS DELETE =====
 
-        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (
-            string idparametro, 
+        group.MapDelete("/{id}", async (
+            string idparametro,
             [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+            [FromServices] IBitacoraService bitacora,
+            HttpContext context) =>
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario no autenticado";
+
             var affected = await db.Parametros
-                .Where(model => model.IdParametro == idparametro)
+                .Where(p => p.IdParametro == idparametro)
                 .ExecuteDeleteAsync();
 
-            if (affected == 0) 
-            { 
-            
+            if (affected == 0)
+            {
                 await bitacora.RegistrarAccionBitacora(
-                    "Usuario no autenticado",
-                    accion: "Eliminar parametro",
-                    resultado: "No encontrado",
-                    descripcion: $"No se encontró el parametro con ID: {idparametro} para eliminar."
+                    usuario,
+                    "Eliminar parámetro",
+                    "No encontrado",
+                    $"No existe el parámetro {idparametro}"
                 );
 
-                return TypedResults.NotFound();
-
+                return ApiResponse<Parametros>.NotFound("El parámetro no existe");
             }
 
             await bitacora.RegistrarAccionBitacora(
-                "Usuario no autenticado",
-                accion: "Eliminar parametro",
-                resultado: "Éxito",
-                descripcion: $"Se eliminó la parametro con ID: {idparametro}."
+                usuario,
+                "Eliminar parámetro",
+                "Éxito",
+                $"Parámetro {idparametro} eliminado"
             );
 
-            return TypedResults.Ok();
+            return ApiResponse<Parametros>.Success(null, "Parámetro eliminado correctamente");
         })
         .WithName("DeleteParametros")
         .WithOpenApi();
