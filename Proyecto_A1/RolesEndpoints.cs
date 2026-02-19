@@ -32,58 +32,79 @@ public static class RolesEndpoints
             
             var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
-            var listaPantallas = await db.Roles.ToListAsync();
+            var roles = await db.Roles
+               .Select(r => new RolDTO
+               {
+                   IdRol = r.IdRol,
+                   Nombre = r.Nombre,
+                   Descripcion = r.Descripcion,
+                   Pantallas = r.RolPorPantalla
+                       .Select(rp => rp.IdPantalla)
+                       .ToList()
+               })
+               .ToListAsync();
 
             await bitacora.RegistrarAccionBitacora(
-                usuario: usuario,
-                accion: "Consulta de roles",
-                resultado: "Éxito",
-                descripcion: $"El usuario {usuario} consultó la lista de roles."
-            );
+               usuario: usuario,
+               accion: "Consulta de roles",
+               resultado: "Éxito",
+               descripcion: $"El usuario {usuario} consultó la lista de roles."
+           );
 
-            return await db.Roles.ToListAsync();
+            return Results.Ok(roles);
+
+            //return await db.Roles.ToListAsync();
         })
         .WithName("GetAllRoles")
         .WithOpenApi();
 
         // ===== METODOS GET POR ID =====
 
-        group.MapGet("/{id}", async Task<Results<Ok<Roles>, NotFound>> (
-            int idrol, 
+        group.MapGet("/{id}", async (
+            int id,
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora,
             HttpContext context) =>
-        {
-
-            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido"; // Aquí podrías obtener el usuario autenticado desde el contexto
-            var rol = await db.Roles
-               .AsNoTracking()
-               .FirstOrDefaultAsync(model => model.IdRol== idrol);
-
-            if (rol is null)
             {
+                var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
+
+                var rol = await db.Roles
+                    .Where(r => r.IdRol == id)
+                    .Select(r => new RolDTO
+                    {
+                        IdRol = r.IdRol,
+                        Nombre = r.Nombre,
+                        Descripcion = r.Descripcion,
+                        Pantallas = r.RolPorPantalla
+                            .Select(rp => rp.IdPantalla)
+                            .ToList()
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (rol is null)
+                {
+                    await bitacora.RegistrarAccionBitacora(
+                        usuario,
+                        "Obtener rol por ID",
+                        "No encontrado",
+                        $"No se encontró el rol con ID {id}."
+                    );
+
+                    return Results.NotFound();
+                }
+
                 await bitacora.RegistrarAccionBitacora(
                     usuario,
-                    "Obtener pantalla por ID",
-                    "No encontrado",
-                    $"No se encontró la pantalla con ID {idrol}."
+                    "Obtener rol por ID",
+                    "Éxito",
+                    $"Se obtuvo el rol con ID {id}."
                 );
 
-                return TypedResults.NotFound();
-            }
+                return Results.Ok(rol);
+            })
+            .WithName("GetRolesById")
+            .WithOpenApi();
 
-            await bitacora.RegistrarAccionBitacora(
-                usuario,
-                "Obtener pantalla por ID",
-                "Éxito",
-                $"Se obtuvo la pantalla con ID {idrol}."
-                );
-
-            return TypedResults.Ok(rol);
-
-        })
-        .WithName("GetRolesById")
-        .WithOpenApi();
 
         // ===== METODOS PUT =====
 
@@ -171,12 +192,40 @@ public static class RolesEndpoints
 
         // ===== METODOS DELETE =====
 
-        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (int idrol, [FromServices] PagosMovilesContext db) =>
+        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (
+            int idrol, 
+            [FromServices] PagosMovilesContext db,
+            [FromServices] IBitacoraService bitacora) =>
+
         {
+
             var affected = await db.Roles
                 .Where(model => model.IdRol == idrol)
                 .ExecuteDeleteAsync();
-            return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
+            
+            if (affected == 1)
+            {
+                await bitacora.RegistrarAccionBitacora(
+                  "Sistema",
+                  "Eliminar Usuario",
+                  "Exitoso",
+                  $"Rol {idrol} eliminado",
+                  "UsuariosEndpoint - DELETE"
+              );
+
+                return TypedResults.Ok();
+            }
+
+            await bitacora.RegistrarAccionBitacora(
+                  "Sistema",
+                  "Eliminar Usuario",
+                  "No encontrado",
+                  $"Rol {idrol} no encontrado para eliminación",
+                  "UsuariosEndpoint - DELETE"
+              );
+
+            return TypedResults.NotFound();
+
         })
         .WithName("DeleteRoles")
         .WithOpenApi();
