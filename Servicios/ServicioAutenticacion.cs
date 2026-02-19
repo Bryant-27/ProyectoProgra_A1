@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿    using System.IdentityModel.Tokens.Jwt;
 using DataAccess.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +10,15 @@ using System.Text;
 
 namespace Servicios
 {
-    //KNG - Tokens para validacion 
+    // DTO de sesión devuelta al cliente
+    public class Sesion
+    {
+        public int UsuarioId { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty;
+    }
+
+    // Servicio mínimo para satisfacer el controlador
     public class ServicioAutenticacion
     {
         private readonly DbContext_Tokens _context;
@@ -24,7 +32,12 @@ namespace Servicios
             _secretKey = config["Settings:SecretKey"] ?? throw new Exception("SecretKey no configurada en appsettings."); ;
         }
 
-        public async Task<InicioSesion?> ValidarYAutenticar(int idUsuario, string nombre, string password)
+        // Constructor vacío o inyectar dependencias reales aquí
+        public ServicioAutenticacion() { }
+
+        // Método esperado por el controlador:
+        // Task<Sesion?> ValidarYAutenticar(int idUsuario, string nombre, string password)
+        public async Task<Sesion?> ValidarYAutenticar(int idUsuario, string nombre, string password)
         {
             var usuario = await _context.Usuarios
                 .Where(u => u.IdUsuario == idUsuario && u.Usuario == nombre && u.Contraseña == password)
