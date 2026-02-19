@@ -38,7 +38,7 @@ public static class TablaPantallasEndpoints
             var listaPantallas = await db.TablaPantallas.ToListAsync();
 
             await bitacora.RegistrarAccionBitacora(
-                usuario: usuario,
+                usuario,
                 accion: "Obtener todas las pantallas",
                 resultado: "Éxito",
                 descripcion: $"Se obtuvieron {listaPantallas.Count} pantallas."
@@ -244,9 +244,6 @@ public static class TablaPantallasEndpoints
 
             if (existente)
                 errores.Add($"El IdPantalla {tablaPantallas.IdPantalla} ya existe en el sistema.");
-            {
-                
-            }
 
             if (errores.Any())
             {
