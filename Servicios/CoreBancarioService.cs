@@ -1,5 +1,5 @@
 ﻿using DataAccess.Models;
-using Logica_Negocio.Services;  // ← Cambiado de Logica_Negocio.Services.Interfaces
+using Logica_Negocio.Services;// ← Cambiado de Logica_Negocio.Services.Interfaces
 using Microsoft.EntityFrameworkCore;
 using Servicios.Interfaces;
 
