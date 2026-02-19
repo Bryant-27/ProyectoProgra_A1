@@ -26,9 +26,9 @@ public static class ParametrosEndpoints
 
             await bitacora.RegistrarAccionBitacora(
                 usuario,
-                accion: "Obtener todas las pantallas",
+                accion: "Obtener todas los Parametro",
                 resultado: "Éxito",
-                descripcion: $"Se obtuvieron {lista.Count} pantallas."
+                descripcion: $"Se obtuvieron {lista.Count} parametros."
             );
 
             return await db.Parametros.ToListAsync();
@@ -136,7 +136,7 @@ public static class ParametrosEndpoints
                 descripcion: $"Se creó la pantalla con ID: {parametros.IdParametro}."
             );
 
-            return TypedResults.Created($"/api/Parametros/{parametros.IdParametro}",parametros);
+            return TypedResults.Created($"/parametro/{parametros.IdParametro}",parametros);
         })
         .WithName("CreateParametros")
         .WithOpenApi();
@@ -157,9 +157,9 @@ public static class ParametrosEndpoints
             
                 await bitacora.RegistrarAccionBitacora(
                     "Usuario no autenticado",
-                    accion: "Eliminar pantalla",
+                    accion: "Eliminar parametro",
                     resultado: "No encontrado",
-                    descripcion: $"No se encontró la pantalla con ID: {idparametro} para eliminar."
+                    descripcion: $"No se encontró el parametro con ID: {idparametro} para eliminar."
                 );
 
                 return TypedResults.NotFound();
@@ -168,9 +168,9 @@ public static class ParametrosEndpoints
 
             await bitacora.RegistrarAccionBitacora(
                 "Usuario no autenticado",
-                accion: "Eliminar pantalla",
+                accion: "Eliminar parametro",
                 resultado: "Éxito",
-                descripcion: $"Se eliminó la pantalla con ID: {idparametro}."
+                descripcion: $"Se eliminó la parametro con ID: {idparametro}."
             );
 
             return TypedResults.Ok();
