@@ -15,10 +15,10 @@ namespace Entities
         public int CuentaId { get; set; }
         public DateTime FechaMovimiento { get; set; }
         public decimal Monto { get; set; }
-        public string TipoMovimiento { get; set; }
-        public string Descripcion { get; set; }
+        public string TipoMovimiento { get; set; } = null!;
+        public string Descripcion { get; set; } = null!;
         public decimal SaldoAnterior { get; set; }
         public decimal SaldoNuevo { get; set; }
-        public string ReferenciaExterna { get; set; }
+        public string ReferenciaExterna { get; set; } = null!;
     }
 }

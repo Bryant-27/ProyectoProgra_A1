@@ -1,5 +1,5 @@
 ﻿using DataAccess.Models;
-using Logica_Negocio.Services.Interfaces;
+using Logica_Negocio.Services;
 using Microsoft.EntityFrameworkCore;
 using Servicios.Interfaces;
 
@@ -29,7 +29,7 @@ namespace Servicios
                 var existe = await _context.ClientesBanco
                     .AnyAsync(c => c.Identificacion == identificacion && c.IdEstado == 1);
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_CLIENTE",
                     resultado: existe ? "EXITO" : "NO_ENCONTRADO",
@@ -41,7 +41,7 @@ namespace Servicios
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_CLIENTE",
                     resultado: "ERROR",
@@ -66,7 +66,7 @@ namespace Servicios
 
                 if (cuenta == null)
                 {
-                    await _bitacoraService.RegistrarAccionBitacora(
+                    await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO",
                         resultado: "NO_ENCONTRADO",
@@ -76,7 +76,7 @@ namespace Servicios
                     return null;
                 }
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO",
                     resultado: "EXITO",
@@ -88,7 +88,7 @@ namespace Servicios
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO",
                     resultado: "ERROR",
@@ -115,7 +115,7 @@ namespace Servicios
                     .Take(5)
                     .ToListAsync();
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "EXITO",
@@ -127,7 +127,7 @@ namespace Servicios
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "ERROR",
@@ -222,7 +222,7 @@ namespace Servicios
                     await transaction.CommitAsync();
 
                     // Bitácora
-                    await _bitacoraService.RegistrarAccionBitacora(
+                    await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "TRANSACCION",
                         resultado: "EXITO",
@@ -240,7 +240,7 @@ namespace Servicios
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "TRANSACCION",
                     resultado: "ERROR",
@@ -275,7 +275,7 @@ namespace Servicios
 
                 if (!existe)
                 {
-                    await _bitacoraService.RegistrarAccionBitacora(
+                    await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
                         resultado: "NO_AFILIADO",  // Valor corto
@@ -289,7 +289,7 @@ namespace Servicios
                 // PASO 2: Validar que la identificación coincida
                 if (identificacionAfiliacion != identificacion)
                 {
-                    await _bitacoraService.RegistrarAccionBitacora(
+                    await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
                         resultado: "ID_NO_COINCIDE",  // Valor corto
@@ -303,7 +303,7 @@ namespace Servicios
                 // PASO 3: Verificar que tenemos número de cuenta
                 if (string.IsNullOrEmpty(cuenta))
                 {
-                    await _bitacoraService.RegistrarAccionBitacora(
+                    await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
                         resultado: "ERROR_CUENTA",  // Valor corto
@@ -320,7 +320,7 @@ namespace Servicios
                 // PASO 5: Verificar resultado
                 if (saldo == null)
                 {
-                    await _bitacoraService.RegistrarAccionBitacora(
+                    await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
                         resultado: "ERROR_CORE",  
@@ -331,7 +331,7 @@ namespace Servicios
                     return (false, "Error al consultar saldo en el core bancario", null);
                 }
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO_TELEFONO",
                     resultado: "EXITO",  
@@ -343,7 +343,7 @@ namespace Servicios
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO_TELEFONO",
                     resultado: "ERROR",  

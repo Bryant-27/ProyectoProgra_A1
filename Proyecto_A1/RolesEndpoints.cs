@@ -3,8 +3,8 @@ using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
-using Logica_Negocio.Services.Interfaces;
 using Entities;
+using Logica_Negocio.Services;
 
 namespace Proyecto_A1;
 
@@ -33,7 +33,7 @@ public static class RolesEndpoints
 
             var listaPantallas = await db.Roles.ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario: usuario,
                 accion: "Consulta de roles",
                 resultado: "Éxito",
@@ -60,7 +60,7 @@ public static class RolesEndpoints
 
             if (rol is null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Obtener pantalla por ID",
                     "No encontrado",
@@ -70,7 +70,7 @@ public static class RolesEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Obtener pantalla por ID",
                 "Éxito",

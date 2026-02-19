@@ -1,4 +1,4 @@
-﻿using Logica_Negocio.Services.Interfaces;
+﻿using Logica_Negocio.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Servicios.DTOs;
@@ -45,7 +45,7 @@ namespace Proyecto_A1.Controllers
 
                 var existe = await _coreService.ClienteExisteAsync(identificacion);
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_CLIENTE",
                     resultado: "EXITO",
@@ -62,7 +62,7 @@ namespace Proyecto_A1.Controllers
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_CLIENTE",
                     resultado: "ERROR",
@@ -106,7 +106,7 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO",
                     resultado: "EXITO",
@@ -123,7 +123,7 @@ namespace Proyecto_A1.Controllers
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO",
                     resultado: "ERROR",
@@ -168,7 +168,7 @@ namespace Proyecto_A1.Controllers
                     SaldoNuevo = m.SaldoNuevo
                 }).ToList();
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "EXITO",
@@ -185,7 +185,7 @@ namespace Proyecto_A1.Controllers
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "ERROR",
@@ -260,7 +260,7 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "TRANSACCION",
                     resultado: "EXITO",
@@ -277,7 +277,7 @@ namespace Proyecto_A1.Controllers
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "TRANSACCION",
                     resultado: "ERROR",
@@ -322,7 +322,7 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO_TELEFONO",
                     resultado: "EXITO",
@@ -339,7 +339,7 @@ namespace Proyecto_A1.Controllers
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO_TELEFONO",
                     resultado: "ERROR",

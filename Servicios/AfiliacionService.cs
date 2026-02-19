@@ -1,4 +1,4 @@
-﻿using Logica_Negocio.Services.Interfaces;
+﻿using Logica_Negocio.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Servicios.Interfaces;
@@ -38,7 +38,7 @@ namespace Servicios
                     var nombre = reader["Nombre_Completo"].ToString();
                     var numeroCuenta = reader["Numero_Cuenta"].ToString();
 
-                    await _bitacoraService.RegistrarAccionBitacora(
+                    await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_AFILIACION",
                         resultado: "EXITO",
@@ -49,7 +49,7 @@ namespace Servicios
                     return (true, identificacion, nombre, numeroCuenta);
                 }
 
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_AFILIACION",
                     resultado: "NO_ENCONTRADO",
@@ -61,7 +61,7 @@ namespace Servicios
             }
             catch (Exception ex)
             {
-                await _bitacoraService.RegistrarAccionBitacora(
+                await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_AFILIACION",
                     resultado: "ERROR",

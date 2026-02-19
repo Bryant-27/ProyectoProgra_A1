@@ -3,7 +3,7 @@ using DataAccess.Models;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
-using Logica_Negocio.Services.Interfaces;
+using Logica_Negocio.Services;
 namespace Proyecto_A1;
 
 public static class TablaPantallasEndpoints
@@ -28,7 +28,7 @@ public static class TablaPantallasEndpoints
         /*------- METODOS GET TRAER TODOS LOS USUARIOS -------*/
 
         group.MapGet("/", async (
-            IBitacoraService bitacora,
+            [FromServices] IBitacoraService bitacora,
             [FromServices] PagosMovilesContext db,
             HttpContext context) =>
         {
@@ -37,7 +37,7 @@ public static class TablaPantallasEndpoints
 
             var listaPantallas = await db.TablaPantallas.ToListAsync();
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario: usuario,
                 accion: "Obtener todas las pantallas",
                 resultado: "Éxito",
@@ -65,7 +65,7 @@ public static class TablaPantallasEndpoints
 
             if (pantalla is null)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     usuario,
                     "Obtener pantalla por ID",
                     "No encontrado",
@@ -75,7 +75,7 @@ public static class TablaPantallasEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 usuario,
                 "Obtener pantalla por ID",
                 "Éxito",
@@ -173,7 +173,7 @@ public static class TablaPantallasEndpoints
 
             if (affected == 1)
             {
-                await bitacora.RegistrarAccionBitacora(
+                await bitacora.RegistrarAsync(
                     "Sistema",
                     "Actualizar Usuario",
                     "Exitoso",
@@ -184,7 +184,7 @@ public static class TablaPantallasEndpoints
                 return TypedResults.Ok();
             }
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                 "Sistema",
                 "Actualizar Pantalla",
                 "No encontrado",
@@ -269,7 +269,7 @@ public static class TablaPantallasEndpoints
             
             //Registro en bitacora
 
-            await bitacora.RegistrarAccionBitacora(
+            await bitacora.RegistrarAsync(
                "Sistema",
                "Crear pantalla",
                "Éxito",
@@ -295,7 +295,7 @@ public static class TablaPantallasEndpoints
 
             if (affected == 0)
             {
-                await bitadora.RegistrarAccionBitacora(
+                await bitadora.RegistrarAsync(
                     "Usuario desconocido",
                     "Eliminar pantalla",
                     "No encontrado",
@@ -304,7 +304,7 @@ public static class TablaPantallasEndpoints
                 return TypedResults.NotFound();
             }
 
-            await bitadora.RegistrarAccionBitacora(
+            await bitadora.RegistrarAsync(
                 "Usuario desconocido",
                 "Eliminar pantalla",
                 "Éxito",

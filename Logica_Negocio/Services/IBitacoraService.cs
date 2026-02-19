@@ -8,6 +8,11 @@ namespace Logica_Negocio.Services
 {
     public interface IBitacoraService
     {
-        Task RegistrarAsync(string usuario, string accion, string descripcion, string servicio, string resultado);
+        Task RegistrarAsync(
+            string usuario, 
+            string accion,
+            string resultado, 
+            string descripcion = "", 
+            string servicio = "");
     }
 }
