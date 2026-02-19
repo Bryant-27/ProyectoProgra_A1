@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Logica_Negocio.Services.Interfaces;
+using Proyecto_A1.Helper;
 namespace Proyecto_A1;
 
 public static class TablaPantallasEndpoints
@@ -90,122 +91,53 @@ public static class TablaPantallasEndpoints
 
         /*==== METODOS PUT ======*/
 
-        group.MapPut("/{idpantalla:int}", async Task<IResult> (
+        group.MapPut("/{id}", async (
             int idpantalla,
-            [FromBody] TablaPantallas tablaPantallas,
+            [FromBody] TablaPantallas pantalla,
             [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+            [FromServices] IBitacoraService bitacora,
+            HttpContext context) =>
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario desconocido";
 
-            
+            var errores = ValidationHelper.ValidarModelo(pantalla);
 
             if (idpantalla <= 0)
-            {
-                return Results.BadRequest(new
-                {
-                    succes = false,
-                    status = 400,
-                    error = new
-                    {
-                        code = "VALIDATION_ERROR",
-                        message = "El IdPantalla debe ser un número positivo mayor que cero.",
-                        details = new List<string> { "IdPantalla inválido." }
-                    }
-                });
-            }
-
-            var errores = new List<string>();
-
-            if (string.IsNullOrEmpty(tablaPantallas.Nombre))
-                errores.Add("El campo Nombre es obligatorio.");
-
-            if (string.IsNullOrEmpty(tablaPantallas.Descripcion))
-                errores.Add("El campo Descripcion es obligatorio.");
-
-            if (string.IsNullOrEmpty(tablaPantallas.Ruta))
-                errores.Add("El campo Ruta es obligatorio.");
+                errores.Add("El IdPantalla es inválido.");
 
             if (errores.Any())
-            {
-                return Results.BadRequest(new
-                {
-                    succes = false,
-                    status = 400,
-                    error = new
-                    {
-                        code = "VALIDATION_ERROR",
-                        message = "Datos inválidos",
-                        details = errores
-                    }
-                });
-            }
+                return ApiResponse<TablaPantallas>.Error(errores);
 
-            /* ===== BUSCAR REGISTRO ===== */
-            var pantallaDb = await db.TablaPantallas.FindAsync(idpantalla);
+            var existe = await db.TablaPantallas.AnyAsync(x => x.IdPantalla == idpantalla);
 
-            if (pantallaDb is null)
-            {
-                return Results.NotFound(new
-                {
-                    success = false,
-                    status = 404,
-                    error = new
-                    {
-                        code = "NOT_FOUND",
-                        message = "La pantalla no existe"
-                    }
-                });
-            }
-
-            /* ===== ACTUALIZAR DATOS ===== */
-
-            var affected = await db.TablaPantallas
-                .Where(model => model.IdPantalla == idpantalla)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(model => model.Nombre, tablaPantallas.Nombre.Trim())
-                    .SetProperty(model => model.Descripcion, tablaPantallas.Descripcion.Trim())
-                    .SetProperty(model => model.Ruta, tablaPantallas.Ruta.Trim())
-                );
-
-            //pantallaDb.Nombre = tablaPantallas.Nombre.Trim();
-            //pantallaDb.Descripcion = tablaPantallas.Descripcion.Trim();
-            //pantallaDb.Ruta = tablaPantallas.Ruta.Trim();
-
-            if (affected == 1)
+            if (!existe)
             {
                 await bitacora.RegistrarAccionBitacora(
-                    "Sistema",
-                    "Actualizar Usuario",
-                    "Exitoso",
-                    $"Usuario {idpantalla} actualizado",
-                    "UsuariosEndpoint - PUT"
+                    usuario,
+                    "Actualizar pantalla",
+                    "No encontrado",
+                    $"Pantalla {idpantalla} no existe"
                 );
 
-                return TypedResults.Ok();
+                return ApiResponse<TablaPantallas>.NotFound("Pantalla no encontrada");
             }
 
+            await db.TablaPantallas
+                .Where(x => x.IdPantalla == idpantalla)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Nombre, pantalla.Nombre.Trim())
+                    .SetProperty(x => x.Descripcion, pantalla.Descripcion.Trim())
+                    .SetProperty(x => x.Ruta, pantalla.Ruta.Trim())
+                );
+
             await bitacora.RegistrarAccionBitacora(
-                "Sistema",
-                "Actualizar Pantalla",
-                "No encontrado",
-                $"Intento de actualizar pantalla {idpantalla}",
-                "UsuariosEndpoint - PUT"
+                usuario,
+                "Actualizar pantalla",
+                "Éxito",
+                $"Pantalla {idpantalla} actualizada"
             );
 
-            //return TypedResults.NotFound();
-
-
-            await db.SaveChangesAsync();
-
-            return Results.Ok(new
-            {
-                success = true,
-                status = 200,
-                message = "Pantalla actualizada correctamente",
-                data = pantallaDb
-            });
-
-
+            return ApiResponse<TablaPantallas>.Success(null, "Pantalla actualizada");
 
         })
         .WithName("UpdateTablaPantallas")
@@ -214,101 +146,76 @@ public static class TablaPantallasEndpoints
         /*==== METODOS POST ======*/
 
         group.MapPost("/", async (
-            [FromBody] TablaPantallas tablaPantallas,
-            [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+         [FromBody] TablaPantallas pantalla,
+         [FromServices] PagosMovilesContext db,
+         [FromServices] IBitacoraService bitacora,
+         HttpContext context) =>
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario desconocido";
 
-            /*===== VALIDACIONES =====*/
+            var errores = ValidationHelper.ValidarModelo(pantalla);
 
-            var errores = new List<string>();
-
-            if (tablaPantallas.IdPantalla <=0)
-                errores.Add("El campo IdPantalla debe ser un número positivo mayor que cero.");
-
-            if (string.IsNullOrEmpty(tablaPantallas.Nombre))
-                errores.Add("El campo Nombre es obligatorio.");
-
-            if (string.IsNullOrEmpty(tablaPantallas.Descripcion))
-                errores.Add("El campo Descripcion es obligatorio.");
-
-            if (string.IsNullOrEmpty(tablaPantallas.Ruta))
-                errores.Add("El campo Ruta es obligatorio.");
-
-            // Verificar si el IdPantalla ya existe
-
-            // Podria utilizar 409 Conflict pero en este caso usare 400 Bad Request para mantener la consistencia con otros errores de validacion
-
-            var existente = await db.TablaPantallas
-                .AnyAsync(id => id.IdPantalla == tablaPantallas.IdPantalla);
-
-            if (existente)
-                errores.Add($"El IdPantalla {tablaPantallas.IdPantalla} ya existe en el sistema.");
+            if (pantalla.IdPantalla <= 0)
+                errores.Add("El IdPantalla debe ser mayor que cero.");
 
             if (errores.Any())
-            {
-                return Results.BadRequest(new
-                {
-                    succes = false,
-                    status = 400,
-                    error = new
-                    {
-                        code = "VALIDATION_ERROR",
-                        message = "Datos inválidos",
-                        details = errores
-                    }
-                });
-            }
+                return ApiResponse<TablaPantallas>.Error(errores);
 
+            var existe = await db.TablaPantallas.AnyAsync(x => x.IdPantalla == pantalla.IdPantalla);
 
-            db.TablaPantallas.Add(tablaPantallas);
+            if (existe)
+                return ApiResponse<TablaPantallas>.Error(
+                    new List<string> { "El IdPantalla ya existe." });
+
+            db.TablaPantallas.Add(pantalla);
             await db.SaveChangesAsync();
-            
-            //Registro en bitacora
 
             await bitacora.RegistrarAccionBitacora(
-               "Sistema",
-               "Crear pantalla",
-               "Éxito",
-               $"Se creó la pantalla con ID {tablaPantallas.IdPantalla}."
-           );
+                usuario,
+                "Crear pantalla",
+                "Éxito",
+                $"Pantalla {pantalla.IdPantalla} creada"
+            );
 
-            return TypedResults.Created($"/api/TablaPantallas/{tablaPantallas.IdPantalla}",tablaPantallas);
+            return ApiResponse<TablaPantallas>.Success(pantalla, "Pantalla creada correctamente");
         })
         .WithName("CreateTablaPantallas")
         .WithOpenApi();
 
         /*==== METODOS DELETE ======*/
 
-        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (
-            int idpantalla, 
-            [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitadora) =>
+        group.MapDelete("/{id}", async (
+         int idpantalla,
+         [FromServices] PagosMovilesContext db,
+         [FromServices] IBitacoraService bitacora,
+         HttpContext context) =>
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario desconocido";
 
             var affected = await db.TablaPantallas
-            .Where(model => model.IdPantalla == idpantalla)
-            .ExecuteDeleteAsync();
+                .Where(x => x.IdPantalla == idpantalla)
+                .ExecuteDeleteAsync();
 
             if (affected == 0)
             {
-                await bitadora.RegistrarAccionBitacora(
-                    "Usuario desconocido",
+                await bitacora.RegistrarAccionBitacora(
+                    usuario,
                     "Eliminar pantalla",
                     "No encontrado",
-                    $"No se encontró la pantalla con ID {idpantalla} para eliminar."
+                    $"Pantalla {idpantalla} no existe"
                 );
-                return TypedResults.NotFound();
+
+                return ApiResponse<object>.NotFound("Pantalla no encontrada");
             }
 
-            await bitadora.RegistrarAccionBitacora(
-                "Usuario desconocido",
+            await bitacora.RegistrarAccionBitacora(
+                usuario,
                 "Eliminar pantalla",
                 "Éxito",
-                $"Se eliminó la pantalla con ID {idpantalla}."
+                $"Pantalla {idpantalla} eliminada"
             );
 
-            return TypedResults.Ok();
+            return ApiResponse<object>.Success(null, "Pantalla eliminada");
 
         })
         .WithName("DeleteTablaPantallas")

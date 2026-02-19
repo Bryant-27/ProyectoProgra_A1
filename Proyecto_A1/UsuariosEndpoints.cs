@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Logica_Negocio.Services.Interfaces;
+using Proyecto_A1.Helper;
 
 namespace Proyecto_A1;
 
@@ -138,53 +139,50 @@ public static class UsuariosEndpoints
 
         /*======= METODO PUT ======*/
 
-        group.MapPut("/{idusuario}", async Task<Results<Ok, NotFound>> (
-            int idusuario, 
-            [FromBody] Usuarios usuarios, 
+        group.MapPut("/{idusuario}", async (
+            int idusuario,
+            [FromBody] Usuarios usuarios,
             [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora) =>
         {
+            var errores = ValidationHelper.ValidarModelo(usuarios);
+
+            if (errores.Any())
+                return ApiResponse<object>.Error(errores);
 
             var affected = await db.Usuarios
-       .Where(model => model.IdUsuario == idusuario)
-       .ExecuteUpdateAsync(setters => setters
-           .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto)
-           .SetProperty(m => m.TipoIdentificacion, usuarios.TipoIdentificacion)
-           .SetProperty(m => m.Identificacion, usuarios.Identificacion)
-           .SetProperty(m => m.Email, usuarios.Email)
-           .SetProperty(m => m.Telefono, usuarios.Telefono)
-           .SetProperty(m => m.Usuario, usuarios.Usuario)
-           .SetProperty(m => m.Contraseña, usuarios.Contraseña) // Considerar hashear la contraseña aquí si es necesario o crear un endpoint aparte mas adelante
-           .SetProperty(m => m.IdEstado, usuarios.IdEstado)
-           .SetProperty(m => m.IdRol, usuarios.IdRol)
-       );
-
-            if (affected == 1)
-            {
-                await bitacora.RegistrarAccionBitacora(
-                    "Sistema",
-                    "Actualizar Usuario",
-                    "Exitoso",
-                    $"Usuario {idusuario} actualizado",
-                    "UsuariosEndpoint - PUT"
+                .Where(model => model.IdUsuario == idusuario)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(m => m.NombreCompleto, usuarios.NombreCompleto)
+                    .SetProperty(m => m.TipoIdentificacion, usuarios.TipoIdentificacion)
+                    .SetProperty(m => m.Identificacion, usuarios.Identificacion)
+                    .SetProperty(m => m.Email, usuarios.Email)
+                    .SetProperty(m => m.Telefono, usuarios.Telefono)
+                    .SetProperty(m => m.Usuario, usuarios.Usuario)
+                    .SetProperty(m => m.Contraseña, usuarios.Contraseña)
+                    .SetProperty(m => m.IdEstado, usuarios.IdEstado)
+                    .SetProperty(m => m.IdRol, usuarios.IdRol)
                 );
 
-                return TypedResults.Ok();
-            }
+            if (affected == 0)
+                return ApiResponse<object>.NotFound("Usuario no encontrado");
 
             await bitacora.RegistrarAccionBitacora(
                 "Sistema",
                 "Actualizar Usuario",
-                "No encontrado",
-                $"Intento de actualizar usuario {idusuario}",
+                "Exitoso",
+                $"Usuario {idusuario} actualizado",
                 "UsuariosEndpoint - PUT"
             );
 
-            return TypedResults.NotFound();
-
+            return ApiResponse<object>.Success(
+                null,
+                "Usuario actualizado correctamente"
+            );
         })
         .WithName("UpdateUsuarios")
         .WithOpenApi();
+
 
         /*======= METODO POST ======*/
 
@@ -194,61 +192,12 @@ public static class UsuariosEndpoints
             [FromServices] IBitacoraService bitacora) =>
         {
 
-            /*===== VALIDACIONES =====*/
+            var errores = ValidationHelper.ValidarModelo(usuarios);
 
-            if (string.IsNullOrWhiteSpace(usuarios.NombreCompleto))
-            {
-                return Results.BadRequest(new
-                {
-                    success = false,
-                    status = 400,
-                    error = new
-                    {
-                        code = "VALIDATION_ERROR",
-                        message = "Datos inválidos",
-                        details = new[]
-                        {
-                            "El nombre completo no puede estar vacío ni contener solo espacios"
-                        }
-                    }
-                });
-            }
-
-            if (string.IsNullOrWhiteSpace(usuarios.Email))
-            {
-                return Results.BadRequest(new
-                {
-                    success = false,
-                    status = 400,
-                    error = new
-                    {
-                        code = "VALIDATION_ERROR",
-                        message = "Datos inválidos",
-                        details = new[]
-                        {
-                            "El formato del email no es válido"
-                        }
-                    }
-                });
-
-            }
-
-            try
-            {
-                var mail = new System.Net.Mail.MailAddress(usuarios.Email);
-            }
-            catch
-            {
-                return Results.BadRequest(new
-                {
-                    error = "El formato del email no es válido."
-                });
-            }
-
-            // Hashear de la contraseña 
+            if (errores.Any())
+                return ApiResponse<Usuarios>.Error(errores);
 
             var passwordHasher = new PasswordHasher<Usuarios>();
-
             usuarios.Contraseña = passwordHasher.HashPassword(usuarios, usuarios.Contraseña);
 
             db.Usuarios.Add(usuarios);
@@ -262,8 +211,10 @@ public static class UsuariosEndpoints
                 "UsuariosEndpoint - POST"
             );
 
-            return TypedResults.Created(
-                $"/api/Usuarios/{usuarios.IdUsuario}", usuarios.IdUsuario);
+            return ApiResponse<Usuarios>.Success(
+                usuarios,
+                "Usuario creado correctamente"
+            );
 
 
         })
@@ -273,42 +224,33 @@ public static class UsuariosEndpoints
         /*======= METODO DELETE ======*/
 
 
-        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (
-            int idusuario, 
-            [FromServices] PagosMovilesContext db, 
+        group.MapDelete("/{id}", async (
+            int idusuario,
+            [FromServices] PagosMovilesContext db,
             [FromServices] IBitacoraService bitacora) =>
         {
             var affected = await db.Usuarios
                 .Where(model => model.IdUsuario == idusuario)
                 .ExecuteDeleteAsync();
 
-            if (affected == 1)
-            {
-                await bitacora.RegistrarAccionBitacora(
-                    "Sistema",
-                    "Eliminar Usuario",
-                    "Exitoso",
-                    $"Usuario {idusuario} eliminado",
-                    "UsuariosEndpoint - DELETE"
-                );
-
-                return TypedResults.Ok();
-            }
+            if (affected == 0)
+                return ApiResponse<object>.NotFound("Usuario no encontrado");
 
             await bitacora.RegistrarAccionBitacora(
                 "Sistema",
                 "Eliminar Usuario",
-                "No encontrado",
-                $"Intento de eliminar usuario {idusuario}",
+                "Exitoso",
+                $"Usuario {idusuario} eliminado",
                 "UsuariosEndpoint - DELETE"
             );
 
-            return TypedResults.NotFound();
-
-
-            //return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
+            return ApiResponse<object>.Success(
+                null,
+                "Usuario eliminado correctamente"
+            );
         })
         .WithName("DeleteUsuarios")
         .WithOpenApi();
+
     }
 }
