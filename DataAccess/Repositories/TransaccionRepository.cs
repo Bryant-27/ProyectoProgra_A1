@@ -22,14 +22,14 @@ namespace DataAccess.Repositories
         public async Task<List<TransaccionEnvio>> ObtenerPorFechaYEntidadAsync(
             DateTime fechaInicio,
             DateTime fechaFin,
-            int? entidadId = null)
+            string? entidadId = null!)
         {
             try
             {
                 var query = _context.TransaccionEnvio
                     .Where(t => t.FechaEnvio >= fechaInicio && t.FechaEnvio <= fechaFin);
 
-                if (entidadId.HasValue)
+                if (!string.IsNullOrWhiteSpace(entidadId))
                 {
                     query = query.Where(t =>
                         t.IdEntidadOrigen == entidadId ||

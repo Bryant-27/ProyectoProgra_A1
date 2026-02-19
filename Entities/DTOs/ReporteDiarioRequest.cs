@@ -13,6 +13,6 @@ namespace Entities.DTOs
         public DateTime Fecha { get; set; }
 
         [JsonPropertyName("entidadId")]
-        public int? EntidadId { get; set; }
+        public string? EntidadId { get; set; } = null!;
     }
 }
