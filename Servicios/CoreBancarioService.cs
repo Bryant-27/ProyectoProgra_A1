@@ -1,5 +1,5 @@
 ﻿using DataAccess.Models;
-using Logica_Negocio.Services;
+using Logica_Negocio.Services;// ← Cambiado de Logica_Negocio.Services.Interfaces
 using Microsoft.EntityFrameworkCore;
 using Servicios.Interfaces;
 
@@ -33,7 +33,7 @@ namespace Servicios
                     usuario: "Sistema",
                     accion: "CONSULTA_CLIENTE",
                     resultado: existe ? "EXITO" : "NO_ENCONTRADO",
-                    descripcion: $"Consulta de existencia para identificación: {identificacion}",
+                    descripcion: $"Consulta cliente: {identificacion} = {existe}",
                     servicio: "CoreBancarioService.ClienteExisteAsync"
                 );
 
@@ -45,7 +45,7 @@ namespace Servicios
                     usuario: "Sistema",
                     accion: "CONSULTA_CLIENTE",
                     resultado: "ERROR",
-                    descripcion: $"Error al consultar cliente {identificacion}: {ex.Message}",
+                    descripcion: $"Error: {ex.Message}",
                     servicio: "CoreBancarioService.ClienteExisteAsync"
                 );
                 throw;
@@ -70,7 +70,7 @@ namespace Servicios
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO",
                         resultado: "NO_ENCONTRADO",
-                        descripcion: $"Cuenta {numeroCuenta} no encontrada para identificación {identificacion}",
+                        descripcion: $"Cuenta {numeroCuenta} no encontrada",
                         servicio: "CoreBancarioService.ConsultarSaldoAsync"
                     );
                     return null;
@@ -80,7 +80,7 @@ namespace Servicios
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO",
                     resultado: "EXITO",
-                    descripcion: $"Saldo consultado para cuenta {numeroCuenta}: {cuenta.Saldo:C}",
+                    descripcion: $"Saldo cuenta {numeroCuenta}: {cuenta.Saldo:C}",
                     servicio: "CoreBancarioService.ConsultarSaldoAsync"
                 );
 
@@ -92,7 +92,7 @@ namespace Servicios
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO",
                     resultado: "ERROR",
-                    descripcion: $"Error al consultar saldo: {ex.Message}",
+                    descripcion: $"Error: {ex.Message}",
                     servicio: "CoreBancarioService.ConsultarSaldoAsync"
                 );
                 throw;
@@ -119,7 +119,7 @@ namespace Servicios
                     usuario: "Sistema",
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "EXITO",
-                    descripcion: $"Se consultaron {movimientos.Count} movimientos para cuenta {numeroCuenta}",
+                    descripcion: $"Movimientos para cuenta {numeroCuenta}: {movimientos.Count}",
                     servicio: "CoreBancarioService.ObtenerUltimosMovimientosAsync"
                 );
 
@@ -131,7 +131,7 @@ namespace Servicios
                     usuario: "Sistema",
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "ERROR",
-                    descripcion: $"Error al consultar movimientos: {ex.Message}",
+                    descripcion: $"Error: {ex.Message}",
                     servicio: "CoreBancarioService.ObtenerUltimosMovimientosAsync"
                 );
                 throw;
@@ -148,13 +148,11 @@ namespace Servicios
         {
             try
             {
-                // Validar monto
                 if (monto <= 0)
                 {
                     return (false, "El monto debe ser mayor a cero", null);
                 }
 
-                // Buscar cliente y su cuenta activa
                 var cliente = await _context.ClientesBanco
                     .Include(c => c.Cuentas.Where(cu => cu.IdEstado == 1))
                     .FirstOrDefaultAsync(c => c.Identificacion == identificacion && c.IdEstado == 1);
@@ -170,7 +168,6 @@ namespace Servicios
                     return (false, "Cliente no tiene cuentas activas", null);
                 }
 
-                // Iniciar transacción
                 using var transaction = await _context.Database.BeginTransactionAsync();
 
                 try
@@ -178,10 +175,8 @@ namespace Servicios
                     decimal saldoAnterior = cuenta.Saldo;
                     decimal saldoNuevo;
 
-                    // Procesar según tipo de movimiento
                     if (tipoMovimiento.Equals("DEBITO", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Validar saldo suficiente para débito
                         if (cuenta.Saldo < monto)
                         {
                             await transaction.RollbackAsync();
@@ -199,10 +194,8 @@ namespace Servicios
                         return (false, "Tipo de movimiento inválido. Use CREDITO o DEBITO", null);
                     }
 
-                    // Actualizar saldo
                     cuenta.Saldo = saldoNuevo;
 
-                    // Registrar movimiento
                     var movimiento = new MovimientoCuenta
                     {
                         NumeroCuenta = cuenta.NumeroCuenta,
@@ -218,15 +211,13 @@ namespace Servicios
                     _context.MovimientosCuenta.Add(movimiento);
                     await _context.SaveChangesAsync();
 
-                    // Commit
                     await transaction.CommitAsync();
 
-                    // Bitácora
                     await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "TRANSACCION",
                         resultado: "EXITO",
-                        descripcion: $"{tipoMovimiento} por {monto:C} aplicado a cuenta {cuenta.NumeroCuenta}. Ref: {referenciaExterna}",
+                        descripcion: $"{tipoMovimiento} {monto:C} cuenta {cuenta.NumeroCuenta}",
                         servicio: "CoreBancarioService.AplicarTransaccionAsync"
                     );
 
@@ -244,7 +235,7 @@ namespace Servicios
                     usuario: "Sistema",
                     accion: "TRANSACCION",
                     resultado: "ERROR",
-                    descripcion: $"Error al aplicar transacción: {ex.Message}",
+                    descripcion: $"Error: {ex.Message}",
                     servicio: "CoreBancarioService.AplicarTransaccionAsync"
                 );
                 throw;
@@ -253,23 +244,16 @@ namespace Servicios
 
         // SRV13: Consultar saldo por teléfono
         public async Task<(bool exito, string mensaje, decimal? saldo)> ConsultarSaldoPorTelefonoAsync(
-    string telefono,
-    string identificacion)
+            string telefono,
+            string identificacion)
         {
             try
             {
-                // Validar datos requeridos
-                if (string.IsNullOrWhiteSpace(telefono))
+                if (string.IsNullOrWhiteSpace(telefono) || string.IsNullOrWhiteSpace(identificacion))
                 {
                     return (false, "Debe enviar los datos completos y válidos", null);
                 }
 
-                if (string.IsNullOrWhiteSpace(identificacion))
-                {
-                    return (false, "Debe enviar los datos completos y válidos", null);
-                }
-
-                // PASO 1: Validar que el teléfono esté asociado a pagos móviles
                 var (existe, identificacionAfiliacion, nombre, cuenta) =
                     await _afiliacionService.ObtenerInfoPorTelefonoAsync(telefono);
 
@@ -278,63 +262,55 @@ namespace Servicios
                     await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
-                        resultado: "NO_AFILIADO",  // Valor corto
-                        descripcion: $"Teléfono {telefono} no está afiliado",
+                        resultado: "NO_AFILIADO",
+                        descripcion: $"Teléfono {telefono} no afiliado",
                         servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                     );
-
                     return (false, "Cliente no asociado a pagos móviles", null);
                 }
 
-                // PASO 2: Validar que la identificación coincida
                 if (identificacionAfiliacion != identificacion)
                 {
                     await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
-                        resultado: "ID_NO_COINCIDE",  // Valor corto
-                        descripcion: $"ID {identificacion} no coincide con telf {telefono}",
+                        resultado: "ID_NO_COINCIDE",
+                        descripcion: $"ID {identificacion} no coincide",
                         servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                     );
-
                     return (false, "Identificación no coincide con el teléfono", null);
                 }
 
-                // PASO 3: Verificar que tenemos número de cuenta
                 if (string.IsNullOrEmpty(cuenta))
                 {
                     await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
-                        resultado: "ERROR_CUENTA",  // Valor corto
+                        resultado: "ERROR_CUENTA",
                         descripcion: $"Afiliación {telefono} sin cuenta",
                         servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                     );
-
                     return (false, "Error en configuración de afiliación", null);
                 }
 
-                // PASO 4: Usar SRV15 para consultar el saldo en el core
                 var saldo = await ConsultarSaldoAsync(identificacionAfiliacion, cuenta);
 
-                // PASO 5: Verificar resultado
                 if (saldo == null)
                 {
                     await _bitacoraService.RegistrarAsync(
                         usuario: "Sistema",
                         accion: "CONSULTA_SALDO_TELEFONO",
-                        resultado: "ERROR_CORE",  
-                        descripcion: $"Error core para cuenta {cuenta}",
+                        resultado: "ERROR_CORE",
+                        descripcion: $"Error core cuenta {cuenta}",
                         servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                     );
-
                     return (false, "Error al consultar saldo en el core bancario", null);
                 }
 
                 await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO_TELEFONO",
-                    resultado: "EXITO",  
+                    resultado: "EXITO",
                     descripcion: $"Saldo telf {telefono}: {saldo:C}",
                     servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                 );
@@ -346,11 +322,10 @@ namespace Servicios
                 await _bitacoraService.RegistrarAsync(
                     usuario: "Sistema",
                     accion: "CONSULTA_SALDO_TELEFONO",
-                    resultado: "ERROR",  
+                    resultado: "ERROR",
                     descripcion: $"Error: {ex.Message}",
                     servicio: "CoreBancarioService.ConsultarSaldoPorTelefonoAsync"
                 );
-
                 return (false, $"Error interno: {ex.Message}", null);
             }
         }

@@ -13,6 +13,9 @@ namespace DataAccess.Models
         public DbSet<ClienteBanco> ClientesBanco { get; set; }
         public DbSet<Cuenta> Cuentas { get; set; }
         public DbSet<MovimientoCuenta> MovimientosCuenta { get; set; }
+        public object ClienteBanco { get; set; }
+        public IEnumerable<object> MovimientoCuenta { get; set; }
+        public object Clientes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

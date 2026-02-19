@@ -22,5 +22,7 @@ namespace Entities.DTOs
         public string Descripcion { get; set; }
         public decimal SaldoAnterior { get; set; }
         public decimal SaldoNuevo { get; set; }
+        public DateTime Fecha { get; set; }
+        public string Tipo { get; set; }
     }
 }

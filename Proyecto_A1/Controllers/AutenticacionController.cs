@@ -18,7 +18,14 @@ namespace Proyecto_A1.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var sesion = await _servicio.ValidarYAutenticar(request.IdUsuario, request.Nombre, request.Password);
+            // Añadir una variable local para estadoRegistro asi no se pasa como referencia y se evita el error CS1612
+            string estadoRegistro = string.Empty;
+
+            var sesion = await _servicio.ValidarYAutenticar(
+                request.IdUsuario.ToString(),
+                request.Nombre,
+                request.Password,
+                estadoRegistro);
 
             if (sesion == null)
             {

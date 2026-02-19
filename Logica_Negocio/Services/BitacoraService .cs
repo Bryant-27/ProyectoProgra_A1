@@ -16,7 +16,12 @@ namespace Logica_Negocio.Services
             _context = context;
         }
 
-        public async Task RegistrarAsync(string usuario, string accion, string descripcion, string servicio, string resultado)
+        public async Task RegistrarAsync(
+            string usuario,
+            string accion,
+            string resultado,     // ← CORREGIDO: resultado va antes de descripcion
+            string descripcion = "",
+            string servicio = "")
         {
             var bitacora = new BitacoraMovimiento
             {
