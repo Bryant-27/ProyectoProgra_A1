@@ -108,21 +108,59 @@ public static class RolesEndpoints
 
         // ===== METODOS PUT =====
 
-        group.MapPut("/{id}", async Task<Results<Ok, NotFound>> (
-            int idrol, 
-            [FromBody] Roles roles, 
-            [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
-        {
+        group.MapPut("/{id}", async (
+         int id,
+         [FromBody] RolDTO rol,
+         [FromServices] PagosMovilesContext db,
+         [FromServices] IBitacoraService bitacora,
+         HttpContext context) =>
+            {
+                var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
-            var affected = await db.Roles
-                .Where(model => model.IdRol == idrol)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(m => m.IdRol, roles.IdRol)
-                    .SetProperty(m => m.Nombre, roles.Nombre)
-                    .SetProperty(m => m.Descripcion, roles.Descripcion)
-                    );
-            return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
+                var rolDb = await db.Roles
+                    .Include(r => r.RolPorPantalla)
+                    .FirstOrDefaultAsync(r => r.IdRol == id);
+
+                if (rolDb == null)
+                    return Results.NotFound();
+
+                if (rol.Pantallas == null || !rol.Pantallas.Any())
+                    return Results.BadRequest("Debe asignar al menos una pantalla.");
+
+                var pantallasValidas = await db.TablaPantallas
+                    .Where(p => rol.Pantallas.Contains(p.IdPantalla))
+                    .Select(p => p.IdPantalla)
+                    .ToListAsync();
+
+                if (pantallasValidas.Count != rol.Pantallas.Count)
+                    return Results.BadRequest("Una o más pantallas no existen.");
+
+                // actualizar datos
+                rolDb.Nombre = rol.Nombre;
+                rolDb.Descripcion = rol.Descripcion;
+
+                // borrar relaciones actuales
+                db.RolPorPantalla.RemoveRange(rolDb.RolPorPantalla);
+
+                // crear nuevas relaciones
+                var nuevasRelaciones = rol.Pantallas.Select(idPantalla => new RolPorPantalla
+                {
+                    IdRol = rolDb.IdRol,
+                    IdPantalla = idPantalla
+                });
+
+                db.RolPorPantalla.AddRange(nuevasRelaciones);
+
+                await db.SaveChangesAsync();
+
+                await bitacora.RegistrarAccionBitacora(
+                    usuario,
+                    "Actualizar rol",
+                    "Éxito",
+                    $"Rol {id} actualizado"
+                );
+
+                return Results.Ok();
         })
         .WithName("UpdateRoles")
         .WithOpenApi();
@@ -159,6 +197,15 @@ public static class RolesEndpoints
             db.Roles.Add(NewRol);
             await db.SaveChangesAsync(); //Esto guarda el nuevo rol para obtener su ID 
 
+            var relaciones = rol.Pantallas.Select(idPantalla => new RolPorPantalla
+            {
+                IdRol = NewRol.IdRol,
+                IdPantalla = idPantalla
+            });
+
+            db.RolPorPantalla.AddRange(relaciones);
+            await db.SaveChangesAsync();
+
             foreach (var idPantalla in rol.Pantallas)
             {
                 db.RolPorPantalla.Add(new RolPorPantalla
@@ -193,38 +240,38 @@ public static class RolesEndpoints
         // ===== METODOS DELETE =====
 
         group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (
-            int idrol, 
+            int id, 
             [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
-
+            [FromServices] IBitacoraService bitacora,
+            HttpContext context) =>
         {
 
-            var affected = await db.Roles
-                .Where(model => model.IdRol == idrol)
-                .ExecuteDeleteAsync();
-            
-            if (affected == 1)
-            {
-                await bitacora.RegistrarAccionBitacora(
-                  "Sistema",
-                  "Eliminar Usuario",
-                  "Exitoso",
-                  $"Rol {idrol} eliminado",
-                  "UsuariosEndpoint - DELETE"
-              );
+            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
-                return TypedResults.Ok();
-            }
+             var rol = await db.Roles
+            .Include(r => r.RolPorPantalla)
+                .Include(r => r.Usuarios)
+                .FirstOrDefaultAsync(r => r.IdRol == id);
+            
+            if (rol == null)
+                return TypedResults.NotFound();
+
+            if (rol.RolPorPantalla != null && rol.RolPorPantalla.Any())
+                db.RolPorPantalla.RemoveRange(rol.RolPorPantalla);
+
+            db.Roles.Remove(rol);
+
+            await db.SaveChangesAsync();
 
             await bitacora.RegistrarAccionBitacora(
-                  "Sistema",
-                  "Eliminar Usuario",
-                  "No encontrado",
-                  $"Rol {idrol} no encontrado para eliminación",
-                  "UsuariosEndpoint - DELETE"
-              );
+                usuario,
+                "Eliminar rol",
+                "Éxitoso",
+                $"Rol {id} eliminado"
+            );
 
-            return TypedResults.NotFound();
+            return TypedResults.Ok();
+
 
         })
         .WithName("DeleteRoles")
