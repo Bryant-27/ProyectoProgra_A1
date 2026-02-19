@@ -31,7 +31,17 @@ public static class RolesEndpoints
             
             var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
-            var listaPantallas = await db.Roles.ToListAsync();
+            var roles = await db.Roles
+               .Select(r => new RolDTO
+               {
+                   IdRol = r.IdRol,
+                   Nombre = r.Nombre,
+                   Descripcion = r.Descripcion,
+                   Pantallas = r.RolPorPantalla
+                       .Select(rp => rp.IdPantalla)
+                       .ToList()
+               })
+               .ToListAsync();
 
             await bitacora.RegistrarAsync(
                 usuario: usuario,
@@ -40,68 +50,116 @@ public static class RolesEndpoints
                 descripcion: $"El usuario {usuario} consultó la lista de roles."
             );
 
-            return await db.Roles.ToListAsync();
+            return Results.Ok(roles);
+
+            //return await db.Roles.ToListAsync();
         })
         .WithName("GetAllRoles")
         .WithOpenApi();
 
         // ===== METODOS GET POR ID =====
 
-        group.MapGet("/{id}", async Task<Results<Ok<Roles>, NotFound>> (
-            int idrol, 
+        group.MapGet("/{id}", async (
+            int id,
             [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+            [FromServices] IBitacoraService bitacora,
+            HttpContext context) =>
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
-            var usuario = "Usuario desconocido"; // Aquí podrías obtener el usuario autenticado desde el contexto
             var rol = await db.Roles
-               .AsNoTracking()
-               .FirstOrDefaultAsync(model => model.IdRol== idrol);
+                .Where(r => r.IdRol == id)
+                .Select(r => new RolDTO
+                {
+                    IdRol = r.IdRol,
+                    Nombre = r.Nombre,
+                    Descripcion = r.Descripcion,
+                    Pantallas = r.RolPorPantalla.Select(rp => rp.IdPantalla).ToList()
+                })
+                .FirstOrDefaultAsync();
 
-            if (rol is null)
+            if (rol == null)
             {
                 await bitacora.RegistrarAsync(
                     usuario,
-                    "Obtener pantalla por ID",
+                    "Obtener rol",
                     "No encontrado",
-                    $"No se encontró la pantalla con ID {idrol}."
+                    $"Rol {id} no existe"
                 );
 
-                return TypedResults.NotFound();
+                return ApiResponse<RolDTO>.NotFound($"No existe el rol con ID {id}");
             }
 
             await bitacora.RegistrarAsync(
                 usuario,
-                "Obtener pantalla por ID",
+                "Obtener rol",
                 "Éxito",
-                $"Se obtuvo la pantalla con ID {idrol}."
-                );
+                $"Rol {id} consultado"
+            );
 
-            return TypedResults.Ok(rol);
-
+            return ApiResponse<RolDTO>.Success(rol);
         })
-        .WithName("GetRolesById")
-        .WithOpenApi();
+            .WithName("GetRolesById")
+            .WithOpenApi();
+
 
         // ===== METODOS PUT =====
 
-        group.MapPut("/{id}", async Task<Results<Ok, NotFound>> (
-            int idrol, 
-            [FromBody] Roles roles, 
-            [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+        group.MapPut("/{id}", async (
+         int id,
+         [FromBody] RolDTO rol,
+         [FromServices] PagosMovilesContext db,
+         [FromServices] IBitacoraService bitacora,
+         HttpContext context) =>
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
 
+            var errores = ValidationHelper.ValidarModelo(rol);
 
+            if (rol.Pantallas == null || !rol.Pantallas.Any())
+                errores.Add("Debe asignar al menos una pantalla.");
 
-            var affected = await db.Roles
-                .Where(model => model.IdRol == idrol)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(m => m.IdRol, roles.IdRol)
-                    .SetProperty(m => m.Nombre, roles.Nombre)
-                    .SetProperty(m => m.Descripcion, roles.Descripcion)
-                    );
-            return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
+            if (errores.Any())
+                return ApiResponse<RolDTO>.Error(errores);
+
+            var rolDb = await db.Roles
+                .Include(r => r.RolPorPantalla)
+                .FirstOrDefaultAsync(r => r.IdRol == id);
+
+            if (rolDb == null)
+                return ApiResponse<RolDTO>.NotFound($"No existe el rol con ID {id}");
+
+            var pantallasValidas = await db.TablaPantallas
+                .Where(p => rol.Pantallas.Contains(p.IdPantalla))
+                .Select(p => p.IdPantalla)
+                .ToListAsync();
+
+            if (pantallasValidas.Count != rol.Pantallas.Count)
+                return ApiResponse<RolDTO>.Error(new() { "Una o más pantallas no existen." });
+
+            rolDb.Nombre = rol.Nombre;
+            rolDb.Descripcion = rol.Descripcion;
+
+            db.RolPorPantalla.RemoveRange(rolDb.RolPorPantalla);
+
+            var nuevasRelaciones = rol.Pantallas.Select(idPantalla => new RolPorPantalla
+            {
+                IdRol = rolDb.IdRol,
+                IdPantalla = idPantalla
+            });
+
+            db.RolPorPantalla.AddRange(nuevasRelaciones);
+
+            await db.SaveChangesAsync();
+
+            await bitacora.RegistrarAccionBitacora(
+                usuario,
+                "Actualizar rol",
+                "Éxito",
+                $"Rol {id} actualizado"
+            );
+
+            return ApiResponse<RolDTO>.Success(rol, "Rol actualizado correctamente");
         })
         .WithName("UpdateRoles")
         .WithOpenApi();
@@ -109,57 +167,76 @@ public static class RolesEndpoints
         // ===== METODOS POST =====
 
         group.MapPost("/", async (
-            //[FromBody] Roles roles,
-            [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora,
-            [FromBody] RolDTO rol) =>
+            [FromServices] PagosMovilesContext db, 
+            [FromServices] IBitacoraService bitacora, 
+            [FromBody] RolDTO rol, HttpContext context) => 
         {
+            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido"; 
+            if (rol.Pantallas == null || !rol.Pantallas.Any()) 
+                return Results.BadRequest("El rol debe tener al menos una pantalla asignada."); 
+            
+            var pv = await db.TablaPantallas.Where(p => rol.Pantallas.Contains(p.IdPantalla)).Select(p => p.IdPantalla).ToListAsync(); 
+            
+            if (pv.Count != rol.Pantallas.Count) 
+                return Results.BadRequest("La pantalla asignada no existe."); 
+            var NewRol = new Roles { IdRol = rol.IdRol, Nombre = rol.Nombre, Descripcion = rol.Descripcion }; 
+            
+            db.Roles.Add(NewRol); await db.SaveChangesAsync(); //Esto guarda el nuevo rol para obtener su ID
+            
+            var relaciones = rol.Pantallas.Select(idPantalla => new RolPorPantalla 
+            { IdRol = NewRol.IdRol, IdPantalla = idPantalla });
+            
+            db.RolPorPantalla.AddRange(relaciones); 
+            
+            await db.SaveChangesAsync(); 
+            
+            foreach (var idPantalla in rol.Pantallas) 
+            { 
+                db.RolPorPantalla.Add(new RolPorPantalla { IdRol = NewRol.IdRol, IdPantalla = idPantalla }); 
+            } 
+            await db.SaveChangesAsync(); 
 
-            if (rol.Pantallas == null || !rol.Pantallas.Any())
-                return Results.BadRequest("El rol debe tener al menos una pantalla asignada.");
-
-            var pv = await db.TablaPantallas
-                .Where(p => rol.Pantallas.Contains(p.IdPantalla))
-                .Select(p => p.IdPantalla)
-                .ToListAsync();
-
-            if (pv.Count != rol.Pantallas.Count)
-                return Results.BadRequest("La pantalla asignada no existe.");
-
-            var NewRol = new Roles
-            {
-                IdRol = rol.ID,
-                Nombre = rol.Nombre,
-                Descripcion = rol.Descripcion,
-
-            };
-
-            db.Roles.Add(NewRol);
-            await db.SaveChangesAsync(); //Esto guarda el nuevo rol para obtener su ID 
-
-            foreach (var idPantalla in rol.Pantallas)
-            {
-                db.RolPorPantalla.Add(new RolPorPantalla
-                {
-                    IdRol = NewRol.IdRol,
-                    IdPantalla = idPantalla
-                });
-            }
-
-            await db.SaveChangesAsync();
-            return TypedResults.Created($"/api/Roles/{rol.ID}",NewRol);
-        })
+            var respuesta = new RolDTO { IdRol = NewRol.IdRol, Nombre = NewRol.Nombre, Descripcion = NewRol.Descripcion, Pantallas = rol.Pantallas };
+            
+            await bitacora.RegistrarAccionBitacora( usuario, "Crear nuevo rol", "Éxito", $"Se creó un nuevo rol con ID {NewRol.IdRol}." ); 
+            
+            return TypedResults.Created($"/api/Roles/{rol.IdRol}",respuesta); 
+        }) 
         .WithName("CreateRoles")
         .WithOpenApi();
 
-        // ===== METODOS DELETE =====
+            // ===== METODOS DELETE =====
 
-        group.MapDelete("/{id}", async Task<Results<Ok, NotFound>> (int idrol, [FromServices] PagosMovilesContext db) =>
+            group.MapDelete("/{id}", async (
+             int id,
+             [FromServices] PagosMovilesContext db,
+             [FromServices] IBitacoraService bitacora,
+             HttpContext context) =>
         {
-            var affected = await db.Roles
-                .Where(model => model.IdRol == idrol)
-                .ExecuteDeleteAsync();
-            return affected == 1 ? TypedResults.Ok() : TypedResults.NotFound();
+            var usuario = context.User.Identity?.Name ?? "Usuario Desconocido";
+
+            var rol = await db.Roles
+                .Include(r => r.RolPorPantalla)
+                .FirstOrDefaultAsync(r => r.IdRol == id);
+
+            if (rol == null)
+                return ApiResponse<string>.NotFound($"No existe el rol con ID {id}");
+
+            if (rol.RolPorPantalla.Any())
+                db.RolPorPantalla.RemoveRange(rol.RolPorPantalla);
+
+            db.Roles.Remove(rol);
+            await db.SaveChangesAsync();
+
+            await bitacora.RegistrarAccionBitacora(
+                usuario,
+                "Eliminar rol",
+                "Éxito",
+                $"Rol {id} eliminado"
+            );
+
+            return ApiResponse<string>.Success($"Rol {id} eliminado");
+
         })
         .WithName("DeleteRoles")
         .WithOpenApi();

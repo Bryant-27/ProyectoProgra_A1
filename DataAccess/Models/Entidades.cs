@@ -11,10 +11,15 @@ public partial class Entidades
     //En esta clase las llaves foraneas hacen un conflicto para poder usar el login  asi que se aplico  un parche para probar 
 
     [Key]//--segundo error 
-    public int IdEntidad { get; set; }
 
+    [Required(ErrorMessage = "El ID de la entidad es obligatorio")]
+    public string IdEntidad { get; set; } = null!;
+
+    [Required(ErrorMessage = "El nombre de la institucion es obligatorio")]
+    [RegularExpression(@"^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$",ErrorMessage = "El nombre solo puede contener letras y espacios.")]
     public string NombreInstitucion { get; set; } = null!;
 
+    [Required(ErrorMessage ="El ID del estado es requerido")]
     public int? IdEstado { get; set; }
 
     public DateTime? FechaCreacion { get; set; }
@@ -23,9 +28,7 @@ public partial class Entidades
 
     //Esto es lo que da problemas hacer identificacion de foraneas manual
 
-    [NotMapped]
     public virtual ICollection<TransaccionEnvio> TransaccionEnvioIdEntidadDestinoNavigation { get; set; } = new List<TransaccionEnvio>();
 
-    [NotMapped]
     public virtual ICollection<TransaccionEnvio> TransaccionEnvioIdEntidadOrigenNavigation { get; set; } = new List<TransaccionEnvio>();
 }
