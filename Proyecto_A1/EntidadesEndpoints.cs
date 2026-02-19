@@ -11,7 +11,7 @@ public static class EntidadesEndpoints
 {
     public static void MapEntidadesEndpoints (this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/entidad").WithTags(nameof(Entidades));
+        var group = routes.MapGroup("/entidad").RequireAuthorization().WithTags(nameof(Entidades));
 
         // ===== METODOS GET =====
 

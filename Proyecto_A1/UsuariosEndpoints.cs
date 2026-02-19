@@ -235,26 +235,16 @@ public static class UsuariosEndpoints
 
 
         group.MapDelete("/{id}", async (
-            int idusuario,
-            [FromServices] PagosMovilesContext db,
-            [FromServices] IBitacoraService bitacora) =>
+     int idusuario,
+     [FromServices] PagosMovilesContext db,
+     [FromServices] IBitacoraService bitacora) =>
         {
             var affected = await db.Usuarios
                 .Where(model => model.IdUsuario == idusuario)
                 .ExecuteDeleteAsync();
 
-            if (affected == 1)
-            {
-                await bitacora.RegistrarAsync(
-                    "Sistema",
-                    "Eliminar Usuario",
-                    "Exitoso",
-                    $"Usuario {idusuario} eliminado",
-                    "UsuariosEndpoint - DELETE"
-                );
-
-                return TypedResults.Ok();
-            }
+            if (affected == 0)
+                return ApiResponse<object>.NotFound("Usuario no encontrado");
 
             await bitacora.RegistrarAsync(
                 "Sistema",
@@ -269,8 +259,8 @@ public static class UsuariosEndpoints
                 "Usuario eliminado correctamente"
             );
         })
-        .WithName("DeleteUsuarios")
-        .WithOpenApi();
+ .WithName("DeleteUsuarios")
+ .WithOpenApi();
 
     }
 }
