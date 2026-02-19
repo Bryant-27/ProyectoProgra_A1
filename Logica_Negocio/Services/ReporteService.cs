@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using DataAccess.Repositories;
 using DataAccess.Models;
+using Logica_Negocio.Interfaces;  // ← AGREGADO: Para IBitacoraService
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,18 +14,16 @@ namespace Logica_Negocio.Services
     {
         private readonly ILogger<ReporteService> _logger;
         private readonly TransaccionRepository _transaccionRepository;
-        private readonly BitacoraService _bitacoraService;
+        private readonly IBitacoraService _bitacoraService;  // ← CAMBIADO: Usa interfaz en lugar de implementación concreta
 
         public ReporteService(
             ILogger<ReporteService> logger,
             TransaccionRepository transaccionRepository,
-            BitacoraService bitacoraService)      
-
+            IBitacoraService bitacoraService)  // ← CAMBIADO: Ahora recibe la interfaz
         {
             _logger = logger;
             _transaccionRepository = transaccionRepository;
-             _bitacoraService = bitacoraService;
-
+            _bitacoraService = bitacoraService;
         }
 
         /// Genera reporte de transacciones diarias (SRV17)   
@@ -36,6 +35,15 @@ namespace Logica_Negocio.Services
 
                 if (string.IsNullOrEmpty(token) || token.Length < 10)
                 {
+                    // Registrar intento fallido en bitácora
+                    await _bitacoraService.RegistrarAsync(
+                        usuario: "Sistema",
+                        accion: "REPORTE_DIARIO",
+                        resultado: "NO_AUTORIZADO",
+                        descripcion: "Token inválido",
+                        servicio: "ReporteService.GenerarReporteDiarioAsync"
+                    );
+
                     return new ReporteDiarioResponse
                     {
                         Codigo = -1,
@@ -56,12 +64,21 @@ namespace Logica_Negocio.Services
                 var fechaFin = fechaInicio.AddDays(1).AddTicks(-1);
 
                 var transacciones = await _transaccionRepository.ObtenerPorFechaYEntidadAsync(
-                fechaInicio,
-                fechaFin,
-                request.EntidadId);
+                    fechaInicio,
+                    fechaFin,
+                    request.EntidadId);
 
                 if (transacciones == null || !transacciones.Any())
                 {
+                    // Registrar en bitácora que no hay transacciones
+                    await _bitacoraService.RegistrarAsync(
+                        usuario: "Sistema",
+                        accion: "REPORTE_DIARIO",
+                        resultado: "SIN_DATOS",
+                        descripcion: $"No se encontraron transacciones para fecha {request.Fecha:yyyy-MM-dd}",
+                        servicio: "ReporteService.GenerarReporteDiarioAsync"
+                    );
+
                     return new ReporteDiarioResponse
                     {
                         Codigo = 0,
@@ -84,6 +101,15 @@ namespace Logica_Negocio.Services
                     Estado = t.IdEstado == 4 ? "COMPLETADA" : "PENDIENTE"
                 }).ToList();
 
+                // Registrar éxito en bitácora
+                await _bitacoraService.RegistrarAsync(
+                    usuario: "Sistema",
+                    accion: "REPORTE_DIARIO",
+                    resultado: "EXITO",
+                    descripcion: $"Reporte generado: {transacciones.Count} transacciones, total {montoTotal:C}",
+                    servicio: "ReporteService.GenerarReporteDiarioAsync"
+                );
+
                 return new ReporteDiarioResponse
                 {
                     Codigo = 0,
@@ -98,6 +124,15 @@ namespace Logica_Negocio.Services
             {
                 _logger.LogError(ex, "SRV17 - Error generando reporte diario");
 
+                // Registrar error en bitácora
+                await _bitacoraService.RegistrarAsync(
+                    usuario: "Sistema",
+                    accion: "REPORTE_DIARIO",
+                    resultado: "ERROR",
+                    descripcion: ex.Message,
+                    servicio: "ReporteService.GenerarReporteDiarioAsync"
+                );
+
                 return new ReporteDiarioResponse
                 {
                     Codigo = -1,
@@ -105,6 +140,5 @@ namespace Logica_Negocio.Services
                 };
             }
         }
-
     }
 }

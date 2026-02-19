@@ -1,6 +1,6 @@
 ﻿using DataAccess.Models;
 
-namespace Logica_Negocio.Services
+namespace Logica_Negocio.Interfaces
 {
     public interface IAfiliacionService
     {

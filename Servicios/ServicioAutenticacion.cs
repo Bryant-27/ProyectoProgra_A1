@@ -37,7 +37,7 @@ namespace Servicios
 
         // Método esperado por el controlador:
         // Task<Sesion?> ValidarYAutenticar(int idUsuario, string nombre, string password)
-        public async Task<Sesion?> ValidarYAutenticar(int idUsuario, string nombre, string password)
+        public async Task<InicioSesion?> ValidarYAutenticar(int idUsuario, string nombre, string password)
         {
             var usuario = await _context.Usuarios
                 .Where(u => u.IdUsuario == idUsuario && u.Usuario == nombre && u.Contraseña == password)

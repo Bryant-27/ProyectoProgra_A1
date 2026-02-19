@@ -1,6 +1,6 @@
 ﻿using DataAccess.Models;
 using DataAccess.Repositories;
-//using Servicios.Interfaces;
+using Logica_Negocio.Interfaces;  // ← Cambiado
 
 namespace Logica_Negocio.Services
 {

@@ -1,10 +1,8 @@
-﻿using Logica_Negocio.Services;
+﻿using Logica_Negocio.Interfaces;  // ← Cambiado
+using Logica_Negocio.Services;    // Para BitacoraService
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Entities.DTOs;
-using Servicios;
 using System.Security.Claims;
-using Abstract.Interfaces;
 
 namespace Proyecto_A1.Controllers
 {
@@ -29,7 +27,7 @@ namespace Proyecto_A1.Controllers
             return User.FindFirst(ClaimTypes.Name)?.Value ?? "Sistema";
         }
 
-        // SRV19: Verificar si un cliente existe
+        // SRV19
         [HttpGet("client-exists")]
         public async Task<IActionResult> ClienteExiste([FromQuery] string identificacion)
         {
@@ -37,11 +35,7 @@ namespace Proyecto_A1.Controllers
             {
                 if (string.IsNullOrWhiteSpace(identificacion))
                 {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "La identificación es requerida"
-                    });
+                    return BadRequest(new { codigo = -1, descripcion = "Identificación requerida" });
                 }
 
                 var existe = await _coreService.ClienteExisteAsync(identificacion);
@@ -50,16 +44,11 @@ namespace Proyecto_A1.Controllers
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_CLIENTE",
                     resultado: "EXITO",
-                    descripcion: $"Consulta cliente existe: {identificacion} = {existe}",
+                    descripcion: $"Consulta cliente {identificacion}: {existe}",
                     servicio: "CoreBancarioController.ClienteExiste"
                 );
 
-                return Ok(new
-                {
-                    codigo = 0,
-                    descripcion = "Consulta exitosa",
-                    existe = existe
-                });
+                return Ok(new { codigo = 0, descripcion = "Consulta exitosa", existe });
             }
             catch (Exception ex)
             {
@@ -67,60 +56,40 @@ namespace Proyecto_A1.Controllers
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_CLIENTE",
                     resultado: "ERROR",
-                    descripcion: $"Error: {ex.Message}",
+                    descripcion: ex.Message,
                     servicio: "CoreBancarioController.ClienteExiste"
                 );
-
-                return StatusCode(500, new CoreResponseDto
-                {
-                    Codigo = -1,
-                    Descripcion = "Error interno del servidor"
-                });
+                return StatusCode(500, new { codigo = -1, descripcion = "Error interno" });
             }
         }
 
-        // SRV15: Consultar saldo
+        // SRV15
         [HttpGet("balance")]
-        public async Task<IActionResult> ConsultarSaldo(
-            [FromQuery] string identificacion,
-            [FromQuery] string cuenta)
+        public async Task<IActionResult> ConsultarSaldo([FromQuery] string identificacion, [FromQuery] string cuenta)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(identificacion) || string.IsNullOrWhiteSpace(cuenta))
                 {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Identificación y cuenta son requeridas"
-                    });
+                    return BadRequest(new { codigo = -1, descripcion = "Identificación y cuenta requeridas" });
                 }
 
                 var saldo = await _coreService.ConsultarSaldoAsync(identificacion, cuenta);
 
                 if (saldo == null)
                 {
-                    return NotFound(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Cliente o cuenta no encontrados"
-                    });
+                    return NotFound(new { codigo = -1, descripcion = "Cliente o cuenta no encontrados" });
                 }
 
                 await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO",
                     resultado: "EXITO",
-                    descripcion: $"Saldo consultado para cuenta {cuenta}: {saldo:C}",
+                    descripcion: $"Saldo cuenta {cuenta}: {saldo:C}",
                     servicio: "CoreBancarioController.ConsultarSaldo"
                 );
 
-                return Ok(new SaldoResponseDto
-                {
-                    Codigo = 0,
-                    Descripcion = "Consulta exitosa",
-                    Saldo = saldo
-                });
+                return Ok(new { codigo = 0, descripcion = "Consulta exitosa", saldo });
             }
             catch (Exception ex)
             {
@@ -128,61 +97,35 @@ namespace Proyecto_A1.Controllers
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO",
                     resultado: "ERROR",
-                    descripcion: $"Error: {ex.Message}",
+                    descripcion: ex.Message,
                     servicio: "CoreBancarioController.ConsultarSaldo"
                 );
-
-                return StatusCode(500, new CoreResponseDto
-                {
-                    Codigo = -1,
-                    Descripcion = "Error interno del servidor"
-                });
+                return StatusCode(500, new { codigo = -1, descripcion = "Error interno" });
             }
         }
 
-        // SRV16: Obtener últimos movimientos
+        // SRV16
         [HttpGet("transactions")]
-        public async Task<IActionResult> ObtenerMovimientos(
-            [FromQuery] string identificacion,
-            [FromQuery] string cuenta)
+        public async Task<IActionResult> ObtenerMovimientos([FromQuery] string identificacion, [FromQuery] string cuenta)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(identificacion) || string.IsNullOrWhiteSpace(cuenta))
                 {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Identificación y cuenta son requeridas"
-                    });
+                    return BadRequest(new { codigo = -1, descripcion = "Identificación y cuenta requeridas" });
                 }
 
                 var movimientos = await _coreService.ObtenerUltimosMovimientosAsync(identificacion, cuenta);
-
-                var movimientosDto = movimientos.Select(m => new MovimientoDto
-                {
-                    Fecha = m.FechaMovimiento,
-                    Tipo = m.TipoMovimiento,
-                    Monto = m.Monto,
-                    Descripcion = m.Descripcion,
-                    SaldoAnterior = (decimal)m.SaldoAnterior,
-                    SaldoNuevo = (decimal)m.SaldoNuevo
-                }).ToList();
 
                 await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "EXITO",
-                    descripcion: $"Se consultaron {movimientos.Count} movimientos para cuenta {cuenta}",
+                    descripcion: $"Movimientos cuenta {cuenta}: {movimientos.Count}",
                     servicio: "CoreBancarioController.ObtenerMovimientos"
                 );
 
-                return Ok(new MovimientosResponseDto
-                {
-                    Codigo = 0,
-                    Descripcion = "Consulta exitosa",
-                    Movimientos = movimientosDto
-                });
+                return Ok(new { codigo = 0, descripcion = "Consulta exitosa", movimientos });
             }
             catch (Exception ex)
             {
@@ -190,92 +133,47 @@ namespace Proyecto_A1.Controllers
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_MOVIMIENTOS",
                     resultado: "ERROR",
-                    descripcion: $"Error: {ex.Message}",
+                    descripcion: ex.Message,
                     servicio: "CoreBancarioController.ObtenerMovimientos"
                 );
-
-                return StatusCode(500, new CoreResponseDto
-                {
-                    Codigo = -1,
-                    Descripcion = "Error interno del servidor"
-                });
+                return StatusCode(500, new { codigo = -1, descripcion = "Error interno" });
             }
         }
 
-        // SRV14: Aplicar transacción
+        // SRV14
         [HttpPost("transaction")]
-        public async Task<IActionResult> AplicarTransaccion([FromBody] TransaccionRequestDto request)
+        public async Task<IActionResult> AplicarTransaccion([FromBody] TransaccionRequest request)
         {
             try
             {
-                if (request == null)
+                if (request == null || string.IsNullOrWhiteSpace(request.Identificacion) ||
+                    string.IsNullOrWhiteSpace(request.TipoMovimiento) || request.Monto <= 0)
                 {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Datos de transacción requeridos"
-                    });
+                    return BadRequest(new { codigo = -1, descripcion = "Datos inválidos" });
                 }
 
-                if (string.IsNullOrWhiteSpace(request.Identificacion))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Identificación requerida"
-                    });
-                }
-
-                if (string.IsNullOrWhiteSpace(request.TipoMovimiento))
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Tipo de movimiento requerido (CREDITO/DEBITO)"
-                    });
-                }
-
-                if (request.Monto <= 0)
-                {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Monto debe ser mayor a cero"
-                    });
-                }
-
-            
                 var resultado = await _coreService.AplicarTransaccionAsync(
                     request.Identificacion,
                     request.TipoMovimiento,
-                    (decimal)request.Monto,         
+                    request.Monto,
                     request.ReferenciaExterna,
                     request.Descripcion
                 );
 
                 if (!resultado.Exito)
                 {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = resultado.Mensaje
-                    });
+                    return BadRequest(new { codigo = -1, descripcion = resultado.Mensaje });
                 }
 
                 await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "TRANSACCION",
                     resultado: "EXITO",
-                    descripcion: $"{request.TipoMovimiento} por {request.Monto:C} aplicado. Ref: {request.ReferenciaExterna}",
+                    descripcion: $"{request.TipoMovimiento} {request.Monto:C}",
                     servicio: "CoreBancarioController.AplicarTransaccion"
                 );
 
-                return Ok(new
-                {
-                    codigo = 0,
-                    descripcion = resultado.Mensaje,
-                    nuevoSaldo = resultado.NuevoSaldo
-                });
+                return Ok(new { codigo = 0, descripcion = resultado.Mensaje, nuevoSaldo = resultado.NuevoSaldo });
             }
             catch (Exception ex)
             {
@@ -283,19 +181,14 @@ namespace Proyecto_A1.Controllers
                     usuario: ObtenerUsuarioActual(),
                     accion: "TRANSACCION",
                     resultado: "ERROR",
-                    descripcion: $"Error: {ex.Message}",
+                    descripcion: ex.Message,
                     servicio: "CoreBancarioController.AplicarTransaccion"
                 );
-
-                return StatusCode(500, new CoreResponseDto
-                {
-                    Codigo = -1,
-                    Descripcion = "Error interno del servidor"
-                });
+                return StatusCode(500, new { codigo = -1, descripcion = "Error interno" });
             }
         }
 
-        // SRV13: Consultar saldo por teléfono
+        // SRV13
         [HttpGet("accounts/balance")]
         public async Task<IActionResult> ConsultarSaldoPorTelefono([FromQuery] string telefono, [FromQuery] string identificacion)
         {
@@ -303,38 +196,25 @@ namespace Proyecto_A1.Controllers
             {
                 if (string.IsNullOrWhiteSpace(telefono) || string.IsNullOrWhiteSpace(identificacion))
                 {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = "Debe enviar los datos completos y válidos"
-                    });
+                    return BadRequest(new { codigo = -1, descripcion = "Teléfono e identificación requeridos" });
                 }
 
                 var resultado = await _coreService.ConsultarSaldoPorTelefonoAsync(telefono, identificacion);
 
                 if (!resultado.Exito)
                 {
-                    return BadRequest(new CoreResponseDto
-                    {
-                        Codigo = -1,
-                        Descripcion = resultado.Mensaje
-                    });
+                    return BadRequest(new { codigo = -1, descripcion = resultado.Mensaje });
                 }
 
                 await _bitacoraService.RegistrarAsync(
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO_TELEFONO",
                     resultado: "EXITO",
-                    descripcion: $"Saldo consultado para teléfono {telefono}: {resultado.Saldo:C}",
+                    descripcion: $"Saldo telf {telefono}: {resultado.Saldo:C}",
                     servicio: "CoreBancarioController.ConsultarSaldoPorTelefono"
                 );
 
-                return Ok(new SaldoResponseDto
-                {
-                    Codigo = 0,
-                    Descripcion = resultado.Mensaje,
-                    Saldo = resultado.Saldo
-                });
+                return Ok(new { codigo = 0, descripcion = resultado.Mensaje, saldo = resultado.Saldo });
             }
             catch (Exception ex)
             {
@@ -342,16 +222,20 @@ namespace Proyecto_A1.Controllers
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO_TELEFONO",
                     resultado: "ERROR",
-                    descripcion: $"Error: {ex.Message}",
+                    descripcion: ex.Message,
                     servicio: "CoreBancarioController.ConsultarSaldoPorTelefono"
                 );
-
-                return StatusCode(500, new CoreResponseDto
-                {
-                    Codigo = -1,
-                    Descripcion = "Error interno del servidor"
-                });
+                return StatusCode(500, new { codigo = -1, descripcion = "Error interno" });
             }
         }
+    }
+
+    public class TransaccionRequest
+    {
+        public string Identificacion { get; set; } = null!;
+        public string TipoMovimiento { get; set; } = null!;
+        public decimal Monto { get; set; }
+        public string? ReferenciaExterna { get; set; }
+        public string? Descripcion { get; set; }
     }
 }

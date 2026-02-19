@@ -19,4 +19,8 @@
     <ProjectReference Include="..\Logica_Negocio\Logica_Negocio.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Interfaces\" />
+  </ItemGroup>
+
 </Project>

@@ -1,7 +1,7 @@
-﻿using Abstract.Interfaces;
-using DataAccess.Models;
+﻿using DataAccess.Models;
 using DataAccess.Repositories;
 using Entities.DTOs;
+using Logica_Negocio.Interfaces;
 using Logica_Negocio.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
@@ -85,12 +85,9 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Pagos Móviles API - SRV7, SRV8, SRV11, SRV12, SRV17",
-        Version = "v1",
-        Description = "API para recibir, enviar, rutear transacciones, consultar movimientos y generar reportes"
-    });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "API", Version = "v1" });
+
+    c.CustomSchemaIds(type => type.FullName); // Usa el nombre completo (namespace + clase)
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -110,7 +107,7 @@ builder.Services.AddSwaggerGen(c =>
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id   = "Bearer"
+                    Id = "Bearer"
                 }
             },
             Array.Empty<string>()

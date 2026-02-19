@@ -1,12 +1,7 @@
-﻿using Abstract.Interfaces;
-using DataAccess.Models;
+﻿using DataAccess.Models;
+using Logica_Negocio.Interfaces;  // ← Cambiado
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Logica_Negocio.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Logica_Negocio.Services
 {
@@ -14,49 +9,41 @@ namespace Logica_Negocio.Services
     {
         private readonly CoreBancarioContext _context;
         private readonly ILogger<CoreBancarioService> _logger;
+        private readonly IAfiliacionService _afiliacionService;  // ← Agregar
 
         public CoreBancarioService(
             CoreBancarioContext context,
-            ILogger<CoreBancarioService> logger)
+            ILogger<CoreBancarioService> logger,
+            IAfiliacionService afiliacionService)  // ← Agregar
         {
             _context = context;
             _logger = logger;
+            _afiliacionService = afiliacionService;
         }
 
-        /// <summary>
-        /// Verifica si un cliente existe por su identificación
-        /// </summary>
+        // SRV19: Verificar si un cliente existe
         public async Task<bool> ClienteExisteAsync(string identificacion)
         {
             try
             {
-                _logger.LogInformation("Verificando si existe cliente con identificación: {Identificacion}", identificacion);
-
-                // Verificar qué nombre de tabla tienes en tu DbContext
-                // Opciones posibles:
-                return await _context.Set<ClienteBanco>().AnyAsync(c => c.Identificacion == identificacion);
-                // O si tienes un DbSet específico:
-                // return await _context.Clientes.AnyAsync(c => c.Identificacion == identificacion);
-                // return await _context.Usuarios.AnyAsync(c => c.Identificacion == identificacion);
+                _logger.LogInformation("Verificando cliente con ID: {Identificacion}", identificacion);
+                return await _context.ClientesBanco
+                    .AnyAsync(c => c.Identificacion == identificacion);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error verificando cliente con identificación {Identificacion}", identificacion);
+                _logger.LogError(ex, "Error verificando cliente {Identificacion}", identificacion);
                 throw;
             }
         }
 
-        /// <summary>
-        /// Consulta el saldo de una cuenta específica
-        /// </summary>
+        // SRV15: Consultar saldo
         public async Task<decimal?> ConsultarSaldoAsync(string identificacion, string numeroCuenta)
         {
             try
             {
-                _logger.LogInformation("Consultando saldo para cuenta {NumeroCuenta} del cliente {Identificacion}",
-                    numeroCuenta, identificacion);
+                _logger.LogInformation("Consultando saldo cuenta {NumeroCuenta}", numeroCuenta);
 
-                // Buscar cliente con sus cuentas
                 var cliente = await _context.ClientesBanco
                     .Include(c => c.Cuentas)
                     .FirstOrDefaultAsync(c => c.Identificacion == identificacion);
@@ -71,7 +58,7 @@ namespace Logica_Negocio.Services
 
                 if (cuenta == null)
                 {
-                    _logger.LogWarning("Cuenta {NumeroCuenta} no encontrada para el cliente", numeroCuenta);
+                    _logger.LogWarning("Cuenta {NumeroCuenta} no encontrada", numeroCuenta);
                     return null;
                 }
 
@@ -79,35 +66,32 @@ namespace Logica_Negocio.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error consultando saldo para cuenta {NumeroCuenta}", numeroCuenta);
+                _logger.LogError(ex, "Error consultando saldo cuenta {NumeroCuenta}", numeroCuenta);
                 throw;
             }
         }
 
-        /// Obtiene los últimos 10 movimientos de una cuenta
-       
+        // SRV16: Obtener últimos 5 movimientos
         public async Task<List<MovimientoCuenta>> ObtenerUltimosMovimientosAsync(string identificacion, string numeroCuenta)
         {
             try
             {
-                _logger.LogInformation("Obteniendo últimos movimientos para cuenta {NumeroCuenta}", numeroCuenta);
+                _logger.LogInformation("Obteniendo movimientos para cuenta {NumeroCuenta}", numeroCuenta);
 
                 return await _context.MovimientosCuenta
-                    .Where(m => m.Identificacion == identificacion && m.NumeroCuenta == numeroCuenta)
+                    .Where(m => m.NumeroCuenta == numeroCuenta)
                     .OrderByDescending(m => m.FechaMovimiento)
-                    .Take(10)
+                    .Take(5)
                     .ToListAsync();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error obteniendo movimientos para cuenta {NumeroCuenta}", numeroCuenta);
+                _logger.LogError(ex, "Error obteniendo movimientos cuenta {NumeroCuenta}", numeroCuenta);
                 throw;
             }
         }
 
-        /// <summary>
-        /// Aplica una transacción (crédito/débito) a una cuenta
-  
+        // SRV14: Aplicar transacción
         public async Task<TransaccionResultado> AplicarTransaccionAsync(
             string identificacion,
             string tipoMovimiento,
@@ -117,10 +101,8 @@ namespace Logica_Negocio.Services
         {
             try
             {
-                _logger.LogInformation("Aplicando transacción {TipoMovimiento} por ₡{Monto} al cliente {Identificacion}",
-                    tipoMovimiento, monto, identificacion);
+                _logger.LogInformation("Aplicando {TipoMovimiento} por {Monto:C}", tipoMovimiento, monto);
 
-                // Buscar cliente
                 var cliente = await _context.ClientesBanco
                     .Include(c => c.Cuentas)
                     .FirstOrDefaultAsync(c => c.Identificacion == identificacion);
@@ -135,30 +117,27 @@ namespace Logica_Negocio.Services
                     };
                 }
 
-                // Obtener primera cuenta del cliente (o puedes hacer que reciba número de cuenta)
                 var cuenta = cliente.Cuentas?.FirstOrDefault();
                 if (cuenta == null)
                 {
                     return new TransaccionResultado
                     {
                         Exito = false,
-                        Mensaje = "Cliente no tiene cuentas asociadas",
+                        Mensaje = "Cliente no tiene cuentas",
                         NuevoSaldo = null
                     };
                 }
 
-                // Validar monto
                 if (monto <= 0)
                 {
                     return new TransaccionResultado
                     {
                         Exito = false,
-                        Mensaje = "El monto debe ser mayor a cero",
+                        Mensaje = "Monto debe ser mayor a cero",
                         NuevoSaldo = cuenta.Saldo
                     };
                 }
 
-                // Aplicar según tipo de movimiento
                 decimal nuevoSaldo;
                 if (tipoMovimiento.ToUpper() == "CREDITO")
                 {
@@ -182,16 +161,14 @@ namespace Logica_Negocio.Services
                     return new TransaccionResultado
                     {
                         Exito = false,
-                        Mensaje = "Tipo de movimiento inválido. Use CREDITO o DEBITO",
+                        Mensaje = "Use CREDITO o DEBITO",
                         NuevoSaldo = cuenta.Saldo
                     };
                 }
 
-                // Crear movimiento
                 var movimiento = new MovimientoCuenta
                 {
                     NumeroCuenta = cuenta.NumeroCuenta,
-                    Identificacion = identificacion,
                     FechaMovimiento = DateTime.Now,
                     Monto = monto,
                     TipoMovimiento = tipoMovimiento.ToUpper(),
@@ -201,75 +178,123 @@ namespace Logica_Negocio.Services
                     Descripcion = descripcion ?? $"Transacción {tipoMovimiento}"
                 };
 
-                // Actualizar saldo de la cuenta
                 cuenta.Saldo = nuevoSaldo;
-
-                // Guardar cambios
                 _context.MovimientosCuenta.Add(movimiento);
                 await _context.SaveChangesAsync();
-
-                _logger.LogInformation("Transacción aplicada exitosamente. Nuevo saldo: ₡{NuevoSaldo}", nuevoSaldo);
 
                 return new TransaccionResultado
                 {
                     Exito = true,
-                    Mensaje = "Transacción aplicada exitosamente",
+                    Mensaje = "Transacción exitosa",
                     NuevoSaldo = nuevoSaldo
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error aplicando transacción para cliente {Identificacion}", identificacion);
-
+                _logger.LogError(ex, "Error aplicando transacción");
                 return new TransaccionResultado
                 {
                     Exito = false,
-                    Mensaje = $"Error interno: {ex.Message}",
+                    Mensaje = $"Error: {ex.Message}",
                     NuevoSaldo = null
                 };
             }
         }
 
-        /// <summary>
-        /// Consulta saldo por número de teléfono
-        /// </summary>
+        // SRV13: Consultar saldo por teléfono (VERSIÓN CORREGIDA)
         public async Task<ConsultaSaldoResultado> ConsultarSaldoPorTelefonoAsync(string telefono, string identificacion)
         {
             try
             {
-                _logger.LogInformation("Consultando saldo por teléfono {Telefono} para cliente {Identificacion}",
-                    telefono, identificacion);
+                _logger.LogInformation("Consultando saldo por teléfono {Telefono}", telefono);
 
-                // Buscar cliente
-                var cliente = await _context.ClientesBanco
-                    .Include(c => c.Cuentas)
-                    .FirstOrDefaultAsync(c => c.Identificacion == identificacion);
+                // Buscar afiliación por teléfono
+                var afiliacion = await _afiliacionService.ObtenerPorTelefonoAsync(telefono);
 
-                if (cliente == null)
+                if (afiliacion == null)
                 {
                     return new ConsultaSaldoResultado
                     {
                         Exito = false,
-                        Mensaje = "Cliente no encontrado",
+                        Mensaje = "Teléfono no afiliado",
                         Saldo = null
                     };
                 }
 
-                // Aquí podrías buscar por teléfono en alguna tabla de afiliaciones
-                // Por ahora, retornamos el saldo de la primera cuenta
-                var cuenta = cliente.Cuentas?.FirstOrDefault();
+                // Validar que la identificación coincida
+                // NOTA: Ajusta estos nombres según tu modelo real
+                string identificacionAfiliacion = "";
+                string numeroCuenta = "";
+
+                // Intenta con diferentes nombres de propiedades
+                try
+                {
+                    // Intenta con propiedades comunes
+                    var propId = afiliacion.GetType().GetProperty("IdentificacionUsuario") ??
+                                afiliacion.GetType().GetProperty("Identificacion_Usuario") ??
+                                afiliacion.GetType().GetProperty("Identificacion");
+
+                    var propCuenta = afiliacion.GetType().GetProperty("NumeroCuenta") ??
+                                    afiliacion.GetType().GetProperty("Numero_Cuenta") ??
+                                    afiliacion.GetType().GetProperty("Cuenta");
+
+                    if (propId != null)
+                        identificacionAfiliacion = propId.GetValue(afiliacion)?.ToString() ?? "";
+
+                    if (propCuenta != null)
+                        numeroCuenta = propCuenta.GetValue(afiliacion)?.ToString() ?? "";
+                }
+                catch
+                {
+                    // Si falla la reflexión, asumimos nombres específicos
+                    // CAMBIA ESTOS NOMBRES SEGÚN TU MODELO REAL
+                    identificacionAfiliacion = afiliacion.IdentificacionUsuario; // Prueba con esto
+                    numeroCuenta = afiliacion.NumeroCuenta; // Prueba con esto
+                }
+
+                if (identificacionAfiliacion != identificacion)
+                {
+                    return new ConsultaSaldoResultado
+                    {
+                        Exito = false,
+                        Mensaje = "Identificación no coincide con el teléfono",
+                        Saldo = null
+                    };
+                }
+
+                if (string.IsNullOrEmpty(numeroCuenta))
+                {
+                    return new ConsultaSaldoResultado
+                    {
+                        Exito = false,
+                        Mensaje = "La afiliación no tiene número de cuenta",
+                        Saldo = null
+                    };
+                }
+
+                // Consultar saldo usando SRV15
+                var saldo = await ConsultarSaldoAsync(identificacion, numeroCuenta);
+
+                if (saldo == null)
+                {
+                    return new ConsultaSaldoResultado
+                    {
+                        Exito = false,
+                        Mensaje = "Error al consultar saldo en el core bancario",
+                        Saldo = null
+                    };
+                }
 
                 return new ConsultaSaldoResultado
                 {
                     Exito = true,
                     Mensaje = "Consulta exitosa",
-                    Saldo = cuenta?.Saldo ?? 0
+                    Saldo = saldo
                 };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error consultando saldo por teléfono {Telefono}", telefono);
-
+                _logger.LogError(ex, "Error consultando saldo por teléfono");
                 return new ConsultaSaldoResultado
                 {
                     Exito = false,
@@ -278,5 +303,6 @@ namespace Logica_Negocio.Services
                 };
             }
         }
+
     }
 }

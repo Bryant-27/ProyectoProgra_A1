@@ -1,7 +1,6 @@
 ﻿using DataAccess.Models;
-using System.Threading.Tasks;
 
-namespace Abstract.Interfaces
+namespace Logica_Negocio.Interfaces
 {
     public interface ICoreBancarioService
     {
