@@ -1,7 +1,7 @@
 ﻿using Logica_Negocio.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Servicios.DTOs;
+using Entities.DTOs;
 using Servicios.Interfaces;
 using System.Security.Claims;
 
@@ -164,8 +164,8 @@ namespace Proyecto_A1.Controllers
                     Tipo = m.TipoMovimiento,
                     Monto = m.Monto,
                     Descripcion = m.Descripcion,
-                    SaldoAnterior = m.SaldoAnterior,
-                    SaldoNuevo = m.SaldoNuevo
+                    SaldoAnterior = (decimal)m.SaldoAnterior,
+                    SaldoNuevo = (decimal)m.SaldoNuevo
                 }).ToList();
 
                 await _bitacoraService.RegistrarAsync(
@@ -243,20 +243,21 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
-                var (exito, mensaje, nuevoSaldo) = await _coreService.AplicarTransaccionAsync(
+            
+                var resultado = await _coreService.AplicarTransaccionAsync(
                     request.Identificacion,
                     request.TipoMovimiento,
-                    request.Monto,
+                    (decimal)request.Monto,         
                     request.ReferenciaExterna,
                     request.Descripcion
                 );
 
-                if (!exito)
+                if (!resultado.Exito)
                 {
                     return BadRequest(new CoreResponseDto
                     {
                         Codigo = -1,
-                        Descripcion = mensaje
+                        Descripcion = resultado.Mensaje
                     });
                 }
 
@@ -271,8 +272,8 @@ namespace Proyecto_A1.Controllers
                 return Ok(new
                 {
                     codigo = 0,
-                    descripcion = mensaje,
-                    nuevoSaldo = nuevoSaldo
+                    descripcion = resultado.Mensaje,
+                    nuevoSaldo = resultado.NuevoSaldo
                 });
             }
             catch (Exception ex)
@@ -299,7 +300,6 @@ namespace Proyecto_A1.Controllers
         {
             try
             {
-                // Validar datos requeridos
                 if (string.IsNullOrWhiteSpace(telefono) || string.IsNullOrWhiteSpace(identificacion))
                 {
                     return BadRequest(new CoreResponseDto
@@ -309,16 +309,14 @@ namespace Proyecto_A1.Controllers
                     });
                 }
 
-                // Llamar al servicio
-                var (exito, mensaje, saldo) = await _coreService.ConsultarSaldoPorTelefonoAsync(telefono, identificacion);
+                var resultado = await _coreService.ConsultarSaldoPorTelefonoAsync(telefono, identificacion);
 
-                if (!exito)
+                if (!resultado.Exito)
                 {
-                    // Si el error es de negocio, devolvemos 400 con el mensaje específico
                     return BadRequest(new CoreResponseDto
                     {
                         Codigo = -1,
-                        Descripcion = mensaje
+                        Descripcion = resultado.Mensaje
                     });
                 }
 
@@ -326,15 +324,15 @@ namespace Proyecto_A1.Controllers
                     usuario: ObtenerUsuarioActual(),
                     accion: "CONSULTA_SALDO_TELEFONO",
                     resultado: "EXITO",
-                    descripcion: $"Saldo consultado para teléfono {telefono}: {saldo:C}",
+                    descripcion: $"Saldo consultado para teléfono {telefono}: {resultado.Saldo:C}",
                     servicio: "CoreBancarioController.ConsultarSaldoPorTelefono"
                 );
 
                 return Ok(new SaldoResponseDto
                 {
                     Codigo = 0,
-                    Descripcion = mensaje,
-                    Saldo = saldo
+                    Descripcion = resultado.Mensaje,
+                    Saldo = resultado.Saldo
                 });
             }
             catch (Exception ex)

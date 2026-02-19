@@ -10,5 +10,7 @@ namespace DataAccess.Repositories
     public interface IAfiliacionRepository
     {
         Task<Afiliacion> GetByTelefonoAndIdentificacionAsync(string telefono, string identificacion);
+        Task<Entidades?> ObtenerEntidadPorIdAsync(int id);
+        Task<Afiliacion?> ObtenerPorTelefonoAsync(string telefono);
     }
 }

@@ -41,5 +41,6 @@ namespace DataAccess.Models
         // Navegación
         [ForeignKey("NumeroCuenta")]
         public virtual Cuenta? Cuenta { get; set; }
+        public string Identificacion { get; set; }
     }
 }
