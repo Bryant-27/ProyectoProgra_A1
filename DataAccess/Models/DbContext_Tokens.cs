@@ -21,27 +21,29 @@ namespace DataAccess.Models
             // 1. Configuramos InicioSesion
             modelBuilder.Entity<InicioSesion>(entity =>
             {
-                entity.ToTable("Inicio_Sesion"); // Nombre de la tabla
-                entity.HasKey(e => e.IdSession);  // IdSession ERROR ORTOGRAFICO
+                entity.ToTable("Inicio_Sesion");
+                entity.HasKey(e => e.IdSession);
 
-                //  IGNORAR las propiedades de navegación que causan los errores de columnas extras
-                //NO CAMBIAR KNG ESO DA ERROR NI USARLAS
+                // Ignorar propiedades de navegación
                 entity.Ignore(e => e.IdEstadoNavigation);
                 entity.Ignore(e => e.IdUsuarioNavigation);
 
-                // Mapear las columnas que sí existen para evitar confusiones
+                // Mapear columnas existentes
                 entity.Property(e => e.IdUsuario).HasColumnName("ID_Usuario");
                 entity.Property(e => e.IdEstado).HasColumnName("ID_Estado");
             });
 
-            // Configuraciones Usuarios
+            // 2. Configuramos Usuarios - AHORA CON TODOS LOS IGNORE
             modelBuilder.Entity<Usuarios>(entity =>
             {
                 entity.ToTable("Usuarios");
                 entity.HasKey(u => u.IdUsuario);
 
-                // Ignoramos la lista de inicios de sesión dentro de Usuarios para evitar conflictos
+                // Ignorar TODAS las propiedades de navegación
+                entity.Ignore(u => u.IdEstadoNavigation);
+                entity.Ignore(u => u.IdRolNavigation);
                 entity.Ignore(u => u.InicioSesion);
+                entity.Ignore(u => u.TipoIdentificacionNavigation);
             });
         }
     }

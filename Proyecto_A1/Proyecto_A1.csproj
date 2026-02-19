@@ -24,8 +24,6 @@
 		<ProjectReference Include="..\DataAccess\DataAccess.csproj" />
 		<ProjectReference Include="..\Entities\Entities.csproj" />
 		<ProjectReference Include="..\Logica_Negocio\Logica_Negocio.csproj" />
-		<!-- ❌ ELIMINAR ESTA LÍNEA COMPLETAMENTE: -->
-		<!-- <ProjectReference Include="..\Servicios\Servicios.csproj" /> -->
 	</ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Servicios.DTOs
+namespace Entities.DTOs
 {
     public class LoginRequest
     {
@@ -12,6 +12,12 @@ namespace Servicios.DTOs
 
         [JsonPropertyName("contrasena")]
         public string Contrasena { get; set; } = string.Empty;
+    }
+
+    public class RefreshTokenRequest
+    {
+        [JsonPropertyName("refreshToken")]
+        public string RefreshToken { get; set; } = string.Empty;
     }
 
     public class LoginResponse

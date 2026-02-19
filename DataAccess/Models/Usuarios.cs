@@ -46,14 +46,19 @@ public partial class Usuarios
     [Column("Fecha_Creacion", TypeName = "datetime")]
     public DateTime? FechaCreacion { get; set; }
 
-
+    // ===== PROPIEDADES DE NAVEGACIÓN - TODAS CON [NOTMAPPED] =====
+    [NotMapped]
     [ForeignKey("IdEstado")]
-    public virtual Estados IdEstadoNavigation { get; set; } = null!;
+    public virtual Estados? IdEstadoNavigation { get; set; }
 
+    [NotMapped]
     [ForeignKey("IdRol")]
-    public virtual Roles IdRolNavigation { get; set; } = null!;
+    public virtual Roles? IdRolNavigation { get; set; }
 
+    [NotMapped]
     public virtual ICollection<InicioSesion> InicioSesion { get; set; } = new List<InicioSesion>();
 
-    public virtual TiposIdentificacion TipoIdentificacionNavigation { get; set; } = null!;
+    [NotMapped]
+    [ForeignKey("TipoIdentificacion")]
+    public virtual TiposIdentificacion? TipoIdentificacionNavigation { get; set; }
 }

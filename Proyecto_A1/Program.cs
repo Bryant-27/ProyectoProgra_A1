@@ -1,6 +1,7 @@
 ﻿using DataAccess.Models;
 using DataAccess.Repositories;
 using Entities.DTOs;
+using Logica_Negocio;
 using Logica_Negocio.Interfaces;
 using Logica_Negocio.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -9,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Proyecto_A1;
-using Servicios;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
@@ -64,14 +64,15 @@ builder.Services.AddHttpClient();
 // REPOSITORIOS
 // =====================
 builder.Services.AddScoped<IAfiliacionRepository, AfiliacionRepository>();
+builder.Services.AddScoped<AfiliacionRepository>(); // ← Agregar también la implementación concreta
 builder.Services.AddScoped<TransaccionRepository>();
 //builder.Services.AddScoped<BitacoraRepository>();
 
 // =====================
 // SERVICIOS
 // =====================
-builder.Services.AddScoped<ServicioAutenticacion>();
 builder.Services.AddScoped<IBitacoraService, BitacoraService>();
+builder.Services.AddScoped<IAutenticacionService, ServicioAutenticacion>();
 builder.Services.AddScoped<IMovimientosService, MovimientosService>();
 builder.Services.AddScoped<ICoreBancarioService, CoreBancarioService>();
 builder.Services.AddScoped<IAfiliacionService, AfiliacionService>();
@@ -115,6 +116,18 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// DIAGNÓSTICO - Ver servicios registrados
+Console.WriteLine("=== SERVICIOS REGISTRADOS ===");
+var services = builder.Services;
+foreach (var service in services)
+{
+    if (service.ServiceType.Name.Contains("Autenticacion") ||
+        service.ServiceType.Name.Contains("Bitacora"))
+    {
+        Console.WriteLine($"Service: {service.ServiceType.Name}, Implementation: {service.ImplementationType?.Name}");
+    }
+}
+
 var app = builder.Build();
 
 // =====================
@@ -155,7 +168,7 @@ app.MapPost("/transactions/process", async (
     [FromBody] TransaccionRequest request,
     IHttpClientFactory httpClientFactory,
     IConfiguration config,
-    [FromServices] AfiliacionRepository afiliacionRepo,
+    [FromServices] IAfiliacionRepository afiliacionRepo,
     ILogger<Program> logger) =>
 {
     logger.LogInformation("==========================================");
