@@ -1,39 +1,70 @@
 ﻿using DataAccess.Repositories;
-using DataAccess.Models;         
 using Entities.DTOs;
-using Microsoft.EntityFrameworkCore; 
+using Microsoft.Extensions.Configuration;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace Logica_Negocio.Services
 {
+
+
     public class MovimientosService : IMovimientosService
     {
         private readonly IAfiliacionRepository _afiliacionRepository;
         private readonly IBitacoraService _bitacoraService;
-        private readonly CoreBancarioContext _coreContext; //  Inyectar contexto directo
+        private readonly HttpClient _httpClient;
+        private readonly IConfiguration _configuration;
 
         public MovimientosService(
             IAfiliacionRepository afiliacionRepository,
             IBitacoraService bitacoraService,
-            CoreBancarioContext coreContext) 
+            HttpClient httpClient,
+            IConfiguration configuration)  // ← Inyectar IConfiguration
         {
             _afiliacionRepository = afiliacionRepository;
             _bitacoraService = bitacoraService;
-            _coreContext = coreContext; 
+            _httpClient = httpClient;
+            _configuration = configuration;
+
+            // Configurar BaseAddress aquí con validación
+            var coreUrl = _configuration["Services:CoreBancarioUrl"];
+            if (string.IsNullOrWhiteSpace(coreUrl))
+            {
+                throw new InvalidOperationException("Falta configuración: Services:CoreBancarioUrl");
+            }
+
+            _httpClient.BaseAddress = new Uri(coreUrl);
         }
 
         public async Task<MovimientosResponse> ObtenerUltimosMovimientosAsync(
             string telefono, string identificacion, string usuario)
         {
-            // ... validaciones igual que tienes ...
+            // Validaciones
+            if (string.IsNullOrWhiteSpace(telefono) || string.IsNullOrWhiteSpace(identificacion))
+            {
+                return new MovimientosResponse
+                {
+                    Codigo = -1,
+                    Descripcion = "Debe enviar los datos completos y válidos",
+                    Movimientos = new List<MovimientoDto>()
+                };
+            }
 
             try
             {
+                // Buscar afiliación
                 var afiliacion = await _afiliacionRepository
                     .GetByTelefonoAndIdentificacionAsync(telefono, identificacion);
 
                 if (afiliacion == null)
                 {
-                    // ... igual que tienes ...
+                    await _bitacoraService.RegistrarAsync(
+                        usuario: usuario,
+                        accion: "CONSULTA_MOVIMIENTOS",
+                        resultado: "ERROR",
+                        descripcion: $"Cliente no afiliado: {telefono}",
+                        servicio: "SRV11");
+
                     return new MovimientosResponse
                     {
                         Codigo = -1,
@@ -42,28 +73,36 @@ namespace Logica_Negocio.Services
                     };
                 }
 
-                // ← CAMBIO AQUÍ: Consulta directa a la base de datos Core
-                var movimientos = await _coreContext.MovimientosCuenta
-                    .AsNoTracking()
-                    .Include(m => m.Cuenta)
-                        .ThenInclude(c => c.Cliente)
-                    .Where(m => m.NumeroCuenta == afiliacion.NumeroCuenta &&
-                                m.Cuenta.Cliente.Identificacion == afiliacion.IdentificacionUsuario)
-                    .OrderByDescending(m => m.FechaMovimiento)
-                    .Take(5)
-                    .Select(m => new MovimientoDto
-                    {
-                        MovimientoId = m.MovimientoId,
-                        FechaMovimiento = m.FechaMovimiento,
-                        Monto = m.Monto,
-                        TipoMovimiento = m.TipoMovimiento,
-                        Descripcion = m.Descripcion ?? string.Empty,
-                        SaldoAnterior = m.SaldoAnterior ?? 0,
-                        SaldoNuevo = m.SaldoNuevo ?? 0
-                    })
-                    .ToListAsync();
+                // Llamar al API de Core Bancario (SRV16)
+                var url = $"api/core/transactions?identificacion={afiliacion.IdentificacionUsuario}&cuenta={afiliacion.NumeroCuenta}";
+                var response = await _httpClient.GetAsync(url);
 
-                if (!movimientos.Any())
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    await _bitacoraService.RegistrarAsync(
+                        usuario: usuario,
+                        accion: "CONSULTA_MOVIMIENTOS",
+                        resultado: "ERROR",
+                        descripcion: $"Error Core Bancario: {errorContent}",
+                        servicio: "SRV11");
+
+                    return new MovimientosResponse
+                    {
+                        Codigo = -1,
+                        Descripcion = "Error al consultar movimientos en Core Bancario",
+                        Movimientos = new List<MovimientoDto>()
+                    };
+                }
+
+                // Deserializar respuesta
+                var content = await response.Content.ReadAsStringAsync();
+                var coreResponse = JsonSerializer.Deserialize<CoreMovimientosResponse>(content, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (coreResponse?.Movimientos == null || !coreResponse.Movimientos.Any())
                 {
                     return new MovimientosResponse
                     {
@@ -73,9 +112,24 @@ namespace Logica_Negocio.Services
                     };
                 }
 
+                // Mapear a DTO
+                var movimientos = coreResponse.Movimientos.Select(m => new MovimientoDto
+                {
+                    MovimientoId = m.MovimientoId,
+                    FechaMovimiento = m.FechaMovimiento,
+                    Monto = m.Monto,
+                    TipoMovimiento = m.TipoMovimiento,
+                    Descripcion = m.Descripcion ?? string.Empty,
+                    SaldoAnterior = m.SaldoAnterior,
+                    SaldoNuevo = m.SaldoNuevo
+                }).ToList();
+
                 await _bitacoraService.RegistrarAsync(
-                    usuario, "CONSULTA_MOVIMIENTOS", "EXITO",
-                    $"Cuenta: {afiliacion.NumeroCuenta}, Movs: {movimientos.Count}", "SRV11");
+                    usuario: usuario,
+                    accion: "CONSULTA_MOVIMIENTOS",
+                    resultado: "EXITO",
+                    descripcion: $"Cuenta: {afiliacion.NumeroCuenta}, Movs: {movimientos.Count}",
+                    servicio: "SRV11");
 
                 return new MovimientosResponse
                 {
@@ -89,10 +143,11 @@ namespace Logica_Negocio.Services
                 await _bitacoraService.RegistrarAsync(
                     usuario: usuario,
                     accion: "CONSULTA_MOVIMIENTOS",
-                    resultado: "ERROR",        
-                    descripcion: ex.Message,     
+                    resultado: "ERROR",
+                    descripcion: $"Excepción: {ex.Message}",
                     servicio: "SRV11");
-                        return new MovimientosResponse
+
+                return new MovimientosResponse
                 {
                     Codigo = -1,
                     Descripcion = "Error al consultar movimientos",
@@ -100,5 +155,24 @@ namespace Logica_Negocio.Services
                 };
             }
         }
+    }
+
+    // DTOs para deserializar respuesta del Core
+    public class CoreMovimientosResponse
+    {
+        public int Codigo { get; set; }
+        public string Descripcion { get; set; }
+        public List<CoreMovimientoDto> Movimientos { get; set; }
+    }
+
+    public class CoreMovimientoDto
+    {
+        public long MovimientoId { get; set; }
+        public DateTime FechaMovimiento { get; set; }
+        public decimal Monto { get; set; }
+        public string TipoMovimiento { get; set; }
+        public string Descripcion { get; set; }
+        public decimal SaldoAnterior { get; set; }
+        public decimal SaldoNuevo { get; set; }
     }
 }

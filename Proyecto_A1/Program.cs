@@ -59,10 +59,12 @@ builder.Services.AddScoped<IAfiliacionRepository, AfiliacionRepository>();
 // =====================
 builder.Services.AddScoped<ServicioAutenticacion>();
 builder.Services.AddScoped<IBitacoraService, BitacoraService>();
+builder.Services.AddScoped<IBitacoraConsultaService, BitacoraConsultaService>(); // ← AÑADIDO AQUÍ
 builder.Services.AddScoped<IMovimientosService, MovimientosService>();
 builder.Services.AddScoped<ICoreBancarioService, CoreBancarioService>();
 builder.Services.AddScoped<IAfiliacionService, AfiliacionService>();
-
+// En Program.cs de tu API de Pagos Móviles
+builder.Services.AddHttpClient<IMovimientosService, MovimientosService>();
 // =====================
 // HTTP CLIENT
 // =====================
