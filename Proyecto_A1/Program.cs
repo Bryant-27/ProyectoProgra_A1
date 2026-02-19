@@ -1,8 +1,6 @@
 ﻿using Abstract.Interfaces;
 using DataAccess.Models;
 using DataAccess.Repositories;
-//using Services;
-//using Servicios.Interfaces;
 using Entities.DTOs;
 using Logica_Negocio.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -12,7 +10,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Proyecto_A1;
 using Servicios;
-using Servicios.Interfaces;
 using System.Linq;
 using System.Net.Http;
 using System.Text;

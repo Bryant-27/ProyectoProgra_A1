@@ -2,8 +2,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Entities.DTOs;
-using Servicios.Interfaces;
+using Servicios;
 using System.Security.Claims;
+using Abstract.Interfaces;
 
 namespace Proyecto_A1.Controllers
 {
